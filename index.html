@@ -28,138 +28,140 @@
     button { touch-action: manipulation; }
   </style>
 </head>
-<body class="h-screen w-screen overflow-hidden select-none bg-slate-100 font-sans">
+<body class="min-h-screen w-full overflow-x-hidden select-none bg-slate-100 font-sans">
   
-  <div id="app-container" class="h-full w-full transition-colors duration-500 p-4 md:p-6 flex flex-col">
+  <div id="app-container" class="min-h-screen w-full max-w-7xl mx-auto transition-colors duration-500 p-4 md:p-6 flex flex-col items-center justify-center relative">
     
-    <!-- メインカード（画面いっぱいに広がる） -->
-    <div id="main-card" class="h-full w-full flex flex-col justify-between rounded-[2.5rem] shadow-2xl p-6 md:p-8 border-4 relative overflow-hidden transition-colors duration-500">
+    <!-- メインカード（画面内に収まるサイズに調整） -->
+    <div id="main-card" class="w-full flex flex-col justify-between rounded-[2rem] shadow-xl p-6 md:p-8 border-4 relative overflow-hidden transition-colors duration-500 gap-6">
       
       <!-- 終了時のフラッシュエフェクト -->
       <div id="finish-overlay" class="absolute inset-0 bg-yellow-100/40 pointer-events-none flex items-center justify-center animate-pulse z-0 hidden"></div>
 
       <!-- [上部] ヘッダーエリア -->
       <div class="w-full flex justify-between items-center z-10 shrink-0">
-        <button id="btn-sound" class="p-3 md:p-5 bg-slate-100 hover:bg-slate-200 rounded-2xl md:rounded-3xl transition-all text-slate-600 active:scale-95 text-xl md:text-2xl font-bold">
+        <button id="btn-sound" class="p-3 bg-slate-100 hover:bg-slate-200 rounded-xl md:rounded-2xl transition-all text-slate-600 active:scale-95 text-base md:text-lg font-bold">
           🔊 おとあり
         </button>
 
-        <div class="flex items-center space-x-3 text-blue-500">
-          <span class="text-3xl animate-pulse hidden md:block">✨</span>
-          <h1 class="text-3xl md:text-5xl lg:text-6xl font-black tracking-wider text-slate-800">おそうじ タイマー</h1>
-          <span class="text-3xl animate-pulse hidden md:block">✨</span>
+        <div class="flex items-center space-x-2 text-blue-500">
+          <span class="text-2xl animate-pulse hidden md:block">✨</span>
+          <h1 class="text-2xl md:text-4xl lg:text-5xl font-black tracking-wider text-slate-800">おそうじ タイマー</h1>
+          <span class="text-2xl animate-pulse hidden md:block">✨</span>
         </div>
 
-        <button id="btn-settings" class="p-3 md:p-5 rounded-2xl md:rounded-3xl transition-all active:scale-95 text-xl md:text-2xl font-bold bg-slate-100 hover:bg-slate-200 text-slate-600">
+        <button id="btn-settings" class="p-3 rounded-xl md:rounded-2xl transition-all active:scale-95 text-base md:text-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-600">
           ⚙️ せってい
         </button>
       </div>
 
       <!-- 設定パネル（オーバーレイ表示） -->
-      <div id="settings-modal" class="hidden absolute top-24 left-1/2 transform -translate-x-1/2 w-[90%] max-w-4xl p-8 bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-4 border-slate-200 z-50 animate-float">
-        <div class="flex items-center gap-2 border-b-2 pb-4 mb-6 w-full justify-center">
-          <span class="font-black text-slate-700 text-3xl">⚙️ おそうじの時間をえらぶ</span>
-        </div>
-        <div id="duration-buttons" class="grid grid-cols-4 gap-4 w-full mb-8">
-          <!-- JSで動的に生成 -->
-        </div>
-        <div class="border-t-2 border-slate-100 pt-6 flex justify-between items-center">
-          <button id="btn-close-settings" class="text-slate-500 hover:text-slate-700 font-bold text-xl px-8 py-4 bg-slate-100 rounded-xl">
-            とじる
-          </button>
-          <button id="btn-demo" class="inline-flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all shadow-md">
-            <span>⏱️ 先生用：高速テスト(100倍速)</span>
-          </button>
+      <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
+        <div class="w-full max-w-3xl bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border-4 border-slate-200 p-6 animate-float flex flex-col max-h-full overflow-y-auto">
+          <div class="flex items-center gap-2 border-b-2 pb-3 mb-4 w-full justify-center">
+            <span class="font-black text-slate-700 text-2xl">⚙️ おそうじの時間をえらぶ</span>
+          </div>
+          <div id="duration-buttons" class="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4 w-full mb-6">
+            <!-- JSで動的に生成 -->
+          </div>
+          <div class="border-t-2 border-slate-100 pt-4 flex justify-between items-center flex-wrap gap-4 mt-auto">
+            <button id="btn-close-settings" class="text-slate-500 hover:text-slate-700 font-bold text-lg px-6 py-3 bg-slate-100 rounded-xl">
+              とじる
+            </button>
+            <button id="btn-demo" class="inline-flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold text-base transition-all shadow-md">
+              <span>⏱️ 先生用：高速テスト(100倍速)</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- [中央] タイマーとコントロールボタン（iPad横画面用に横並び） -->
-      <div class="flex-grow flex flex-row items-center justify-center gap-8 lg:gap-16 w-full py-2 z-10">
+      <!-- [中央] タイマーとコントロールボタン -->
+      <div class="flex flex-col md:flex-row items-center justify-center gap-6 lg:gap-12 w-full py-2 z-10">
         
         <!-- デジタルタイマー -->
         <div class="flex flex-col items-center shrink-0">
-          <div class="text-lg md:text-2xl font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2 bg-white/80 px-6 py-2 rounded-full shadow-sm">
+          <div class="text-base md:text-lg font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2 bg-white/80 px-4 py-1.5 rounded-full shadow-sm">
             <span>⏱️</span> のこりじかん
           </div>
-          <div id="timer-container" class="bg-slate-900 px-8 lg:px-16 py-4 lg:py-6 rounded-[2.5rem] shadow-inner border-8 border-slate-800 flex items-baseline justify-center font-mono select-none transition-colors duration-300">
-            <span id="timer-m" class="text-[8rem] lg:text-[13rem] font-black tracking-widest leading-none drop-shadow-md">15</span>
-            <span id="timer-colon" class="text-[6rem] lg:text-[10rem] font-black mx-4 pb-6 leading-none">:</span>
-            <span id="timer-s" class="text-[8rem] lg:text-[13rem] font-black tracking-widest leading-none drop-shadow-md">00</span>
+          <div id="timer-container" class="bg-slate-900 px-6 lg:px-12 py-3 lg:py-4 rounded-3xl shadow-inner border-4 border-slate-800 flex items-baseline justify-center font-mono select-none transition-colors duration-300">
+            <span id="timer-m" class="text-6xl lg:text-8xl font-black tracking-widest leading-none drop-shadow-md">15</span>
+            <span id="timer-colon" class="text-5xl lg:text-7xl font-black mx-3 pb-2 leading-none">:</span>
+            <span id="timer-s" class="text-6xl lg:text-8xl font-black tracking-widest leading-none drop-shadow-md">00</span>
           </div>
         </div>
 
         <!-- コントロールボタン -->
-        <div class="flex flex-col items-center justify-center gap-4 shrink-0 w-[250px] lg:w-[320px]">
-          <button id="btn-start" class="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white py-8 lg:py-10 rounded-[2.5rem] text-4xl lg:text-5xl font-black shadow-2xl active:scale-95 transition-transform">
+        <div class="flex flex-col items-center justify-center gap-4 shrink-0 w-full md:w-[220px] lg:w-[260px]">
+          <button id="btn-start" class="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white py-4 lg:py-6 rounded-[2rem] text-2xl lg:text-3xl font-black shadow-xl active:scale-95 transition-transform">
             <span>▶ スタート</span>
           </button>
           
-          <button id="btn-stop" class="hidden w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white py-8 lg:py-10 rounded-[2.5rem] text-4xl lg:text-5xl font-black shadow-2xl active:scale-95 transition-transform">
+          <button id="btn-stop" class="hidden w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white py-4 lg:py-6 rounded-[2rem] text-2xl lg:text-3xl font-black shadow-xl active:scale-95 transition-transform">
             <span>■ ストップ</span>
           </button>
           
           <!-- 先生用：終了予想時刻 -->
-          <div id="finish-time-container" class="hidden w-full text-center text-slate-500 text-sm lg:text-lg bg-white border-2 border-slate-100 rounded-2xl px-4 py-3 font-bold shadow-sm">
+          <div id="finish-time-container" class="hidden w-full text-center text-slate-500 text-xs lg:text-sm bg-white border-2 border-slate-100 rounded-xl px-3 py-2 font-bold shadow-sm">
             <div class="flex items-center justify-center gap-2 mb-1">
-              <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span>終了予想時刻</span>
             </div>
-            <strong id="finish-time-text" class="text-slate-800 text-2xl lg:text-3xl">--:--</strong>
+            <strong id="finish-time-text" class="text-slate-800 text-xl lg:text-2xl">--:--</strong>
           </div>
         </div>
 
       </div>
 
       <!-- [下部] 吹き出しメッセージ -->
-      <div class="w-full flex items-center justify-center z-10 mb-4 shrink-0">
-        <div class="bg-white/95 rounded-3xl border-4 border-slate-200 px-8 py-4 shadow-lg relative w-11/12 max-w-5xl text-center">
-          <p id="message-text" class="text-4xl lg:text-5xl font-black transition-all duration-300">
+      <div class="w-full flex items-center justify-center z-10 shrink-0">
+        <div class="bg-white/95 rounded-2xl border-4 border-slate-200 px-6 py-3 shadow-md relative w-11/12 max-w-4xl text-center">
+          <p id="message-text" class="text-2xl lg:text-4xl font-black transition-all duration-300">
             じかんをえらんで「スタート」してね！
           </p>
-          <div class="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-white border-r-4 border-b-4 border-slate-200 rotate-45"></div>
+          <div class="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-white border-r-4 border-b-4 border-slate-200 rotate-45"></div>
         </div>
       </div>
 
       <!-- [最下部] ゲージとゾウさん（メーター部分） -->
-      <div class="w-full relative z-10 pt-16 pb-4 px-8 lg:px-16 bg-slate-50/70 rounded-[2.5rem] border-4 border-dashed border-slate-300 shrink-0">
+      <div class="w-full relative z-10 pt-12 pb-3 px-4 md:px-8 lg:px-12 bg-slate-50/70 rounded-3xl border-4 border-dashed border-slate-300 shrink-0 mt-4">
         <div class="relative w-full">
           
           <!-- スタート/ゴールラベル -->
-          <div class="absolute left-0 top-0 text-lg lg:text-xl font-black text-slate-400 transform -translate-y-12 -translate-x-2">
+          <div class="absolute left-0 top-0 text-sm lg:text-base font-black text-slate-400 transform -translate-y-8 -translate-x-1">
             🏠 スタート
           </div>
-          <div class="absolute right-0 top-0 text-6xl lg:text-8xl z-50 transform -translate-y-16 lg:-translate-y-20 translate-x-4 lg:translate-x-8 animate-bounce">
+          <div class="absolute right-0 top-0 text-4xl lg:text-6xl z-50 transform -translate-y-12 lg:-translate-y-14 translate-x-2 lg:translate-x-4 animate-bounce">
             🏁
-            <span class="absolute -top-6 right-0 text-sm lg:text-lg font-black text-red-500 bg-white px-3 py-1 rounded-full border-2 border-red-200 shadow-md whitespace-nowrap">
+            <span class="absolute -top-4 right-0 text-xs lg:text-sm font-black text-red-500 bg-white px-2 py-0.5 rounded-full border-2 border-red-200 shadow-sm whitespace-nowrap">
               ゴール！
             </span>
           </div>
 
           <!-- キャラクター（ゾウさん） -->
-          <div id="elephant-container" class="absolute top-0 z-30 transition-all duration-200 ease-out animate-float" style="left: calc(0% - 3rem); transform: translateY(-60%);">
-            <div class="text-7xl lg:text-9xl select-none flex flex-col items-center">
-              <span id="elephant-text" class="inline-block transform scale-x-[-1] drop-shadow-xl">🐘</span>
+          <div id="elephant-container" class="absolute top-0 z-30 transition-all duration-200 ease-out animate-float" style="left: calc(0% - 2rem); transform: translateY(-50%);">
+            <div class="text-5xl lg:text-7xl select-none flex flex-col items-center">
+              <span id="elephant-text" class="inline-block transform scale-x-[-1] drop-shadow-lg">🐘</span>
             </div>
-            <div id="dust-effect" class="hidden absolute -bottom-2 -left-4 text-4xl animate-ping opacity-60">💨</div>
+            <div id="dust-effect" class="hidden absolute -bottom-1 -left-2 text-2xl animate-ping opacity-60">💨</div>
           </div>
 
           <!-- メーター本体 -->
-          <div class="w-full h-[80px] lg:h-[110px] bg-slate-200 rounded-[3rem] p-3 lg:p-4 shadow-inner relative overflow-hidden flex items-center justify-end">
+          <div class="w-full h-[60px] lg:h-[80px] bg-slate-200 rounded-full p-2 lg:p-3 shadow-inner relative overflow-hidden flex items-center justify-end">
             
-            <div id="progress-bar" class="h-full rounded-[2rem] transition-all duration-200 ease-linear shadow-lg relative z-10 flex items-center" style="width: 100%;">
-              <div class="w-full h-1/2 bg-white/20 absolute top-0 rounded-t-[2rem]"></div>
+            <div id="progress-bar" class="h-full rounded-full transition-all duration-200 ease-linear shadow-lg relative z-10 flex items-center" style="width: 100%;">
+              <div class="w-full h-1/2 bg-white/20 absolute top-0 rounded-t-full"></div>
             </div>
 
             <!-- 1分ごとの区切り線 -->
-            <div id="dividers-container" class="absolute inset-0 py-3 lg:py-4 px-4 flex justify-evenly items-center z-20 pointer-events-none">
+            <div id="dividers-container" class="absolute inset-0 py-2 lg:py-3 px-3 flex justify-evenly items-center z-20 pointer-events-none">
               <!-- JSで動的に生成 -->
             </div>
           </div>
 
           <!-- ゲージ下の補助テキスト -->
-          <div class="w-full flex justify-between px-2 mt-4 text-lg lg:text-xl font-black text-slate-400">
+          <div class="w-full flex justify-between px-2 mt-3 text-sm lg:text-base font-black text-slate-400">
             <span>おわり</span>
-            <span id="duration-display" class="text-slate-500 bg-slate-200 px-6 py-1.5 rounded-full">おそうじタイム： 15ぷん</span>
+            <span id="duration-display" class="text-slate-500 bg-slate-200 px-4 py-1 rounded-full">おそうじタイム： 15ふん</span>
             <span>はじめ</span>
           </div>
         </div>
@@ -366,22 +368,31 @@
       updateUI();
     }
 
+    // 分の読み方を判定する関数
+    function getMinuteReading(min) {
+      if (min === 10 || min === 20) {
+        return 'ぷん';
+      }
+      return 'ふん';
+    }
+
     // 時間設定ボタンの生成
     function initDurationButtons() {
       durationButtonsContainer.innerHTML = '';
       [10, 15, 20, 25].forEach(min => {
         const btn = document.createElement('button');
         const isSelected = durationMinutes === min;
+        const reading = getMinuteReading(min);
         
-        btn.className = `py-6 px-4 rounded-3xl font-black text-3xl md:text-5xl border-4 flex flex-col items-center justify-center gap-2 transition-all ${
+        btn.className = `py-3 md:py-4 px-2 md:px-3 rounded-2xl font-black text-xl md:text-3xl border-4 flex flex-col items-center justify-center gap-1 transition-all ${
           isSelected 
             ? 'bg-blue-500 border-blue-600 text-white shadow-lg transform scale-105' 
             : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
         }`;
         
         btn.innerHTML = `
-          <span>${min} <span class="text-2xl md:text-3xl">分</span></span>
-          ${isSelected ? '<span class="text-3xl">✅</span>' : ''}
+          <span>${min} <span class="text-lg md:text-2xl">${reading}</span></span>
+          ${isSelected ? '<span class="text-xl md:text-2xl">✅</span>' : ''}
         `;
         
         btn.onclick = () => changeDuration(min);
@@ -394,7 +405,7 @@
       dividersContainer.innerHTML = '';
       for (let i = 0; i < durationMinutes - 1; i++) {
         const div = document.createElement('div');
-        div.className = 'h-full w-2 md:w-3 bg-white/90 shadow-sm rounded-full mix-blend-overlay';
+        div.className = 'h-full w-1.5 md:w-2.5 bg-white/90 shadow-sm rounded-full mix-blend-overlay';
         dividersContainer.appendChild(div);
       }
     }
@@ -480,7 +491,7 @@
       addClasses(messageText, theme.text);
 
       // ゾウさんの更新
-      elephantContainer.style.left = `calc(${elephantPosition}% - 3rem)`;
+      elephantContainer.style.left = `calc(${elephantPosition}% - 2rem)`;
       elephantText.textContent = theme.character;
       
       if (isActive) {
@@ -498,7 +509,8 @@
       removeClasses(progressBar, barClasses);
       addClasses(progressBar, theme.bar);
 
-      durationDisplay.textContent = `おそうじタイム： ${durationMinutes}ぷん`;
+      const reading = getMinuteReading(durationMinutes);
+      durationDisplay.textContent = `おそうじタイム： ${durationMinutes}${reading}`;
 
       // ボタン切り替え
       if (!isActive) {
