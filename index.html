@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Square, Timer, Sparkles, Volume2, VolumeX, Settings, Check, Info } from 'lucide-react';
 
-// カスタムアニメーション
-const styles = `
+// カスタムアニメーション（安全な形式で読み込み）
+const customStyles = `
 @keyframes wiggle {
   0%, 100% { transform: rotate(-5deg) translateY(-60%); }
   50% { transform: rotate(5deg) translateY(-70%); }
@@ -219,7 +219,8 @@ export default function App() {
 
   return (
     <div className={`min-h-screen ${theme.bg} transition-colors duration-500 p-4 md:p-6 flex flex-col items-center justify-center font-sans`}>
-      <style>{styles}</style>
+      {/* 安全にCSSスタイルを適用 */}
+      <style dangerouslySetInnerHTML={{ __html: customStyles }} />
       
       {/* iPad向けに幅を広げたメインコンテナ */}
       <div className={`w-full max-w-6xl flex-grow flex flex-col justify-between ${theme.cardBg} rounded-[2.5rem] shadow-2xl p-6 md:p-10 border-4 ${theme.border} relative overflow-hidden transition-colors duration-500`}>
