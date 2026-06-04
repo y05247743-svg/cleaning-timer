@@ -1,0 +1,449 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Play, Square, Timer, Sparkles, Volume2, VolumeX, Settings, Clock, Check, Info } from 'lucide-react';
+
+// Custom CSS animations for a cheerful classroom feel
+const styles = `
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-5deg) translateY(-60%); }
+  50% { transform: rotate(5deg) translateY(-70%); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes dangerFlash {
+  0%, 100% { background-color: #ffffff; }
+  50% { background-color: #ef4444; }
+}
+.animate-wiggle {
+  animation: wiggle 0.5s ease-in-out infinite;
+}
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+.animate-danger-flash {
+  animation: dangerFlash 2s ease-in-out infinite;
+}
+`;
+
+export default function App() {
+  const [isActive, setIsActive] = useState(false);
+  const [durationMinutes, setDurationMinutes] = useState(15); // Options: 10, 15, 20, 25
+  const [remainingTimeMs, setRemainingTimeMs] = useState(15 * 60 * 1000);
+  const [endTime, setEndTime] = useState(null);
+  const [isFinished, setIsFinished] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const [realTime, setRealTime] = useState(new Date());
+  
+  // Demo mode: Speeds up the timer (100x speed) for easy classroom testing
+  const [isDemoMode, setIsDemoMode] = useState(false);
+
+  useEffect(() => {
+    const clockInterval = setInterval(() => {
+      setRealTime(new Date());
+    }, 1000);
+    return () => clearInterval(clockInterval);
+  }, []);
+
+  useEffect(() => {
+    let timerInterval = null;
+
+    if (isActive && endTime) {
+      const speedMultiplier = isDemoMode ? 100 : 1; // 100x speed in demo mode
+
+      timerInterval = setInterval(() => {
+        const now = Date.now();
+        // Calculate remaining time with demo multiplier support
+        let elapsedReal = now - (endTime - (remainingTimeMs / speedMultiplier));
+        let elapsedSimulated = elapsedReal * speedMultiplier;
+        let nextRemaining = (endTime - now) * speedMultiplier;
+
+        // Fallback standard calculation for normal mode
+        if (!isDemoMode) {
+          nextRemaining = endTime - now;
+        }
+
+        if (nextRemaining <= 0) {
+          setRemainingTimeMs(0);
+          setIsActive(false);
+          setIsFinished(true);
+          playFinishedChime();
+          clearInterval(timerInterval);
+        } else {
+          setRemainingTimeMs(nextRemaining);
+        }
+      }, 100);
+    } else {
+      clearInterval(timerInterval);
+    }
+
+    return () => clearInterval(timerInterval);
+  }, [isActive, endTime, isDemoMode]);
+
+  // Generates a sweet, ascending chime melody when the timer completes
+  const playFinishedChime = () => {
+    if (!soundEnabled) return;
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      
+      const playNote = (freq, startTime, duration) => {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        
+        osc.type = 'triangle'; // Gentle, warm tone perfect for kids
+        osc.frequency.setValueAtTime(freq, startTime);
+        
+        gainNode.gain.setValueAtTime(0.2, startTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration - 0.02);
+        
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        
+        osc.start(startTime);
+        osc.stop(startTime + duration);
+      };
+
+      const now = ctx.currentTime;
+      // Do-Mi-Sol-Do ascending happy chime
+      playNote(523.25, now, 0.25);        // C5
+      playNote(659.25, now + 0.15, 0.25); // E5
+      playNote(783.99, now + 0.30, 0.25); // G5
+      playNote(1046.50, now + 0.45, 0.6); // C6
+    } catch (e) {
+      console.warn("Audio Context could not play:", e);
+    }
+  };
+
+  const startTimer = () => {
+    setIsFinished(false);
+    const targetEndTime = Date.now() + (durationMinutes * 60 * 1000);
+    setEndTime(targetEndTime);
+    setRemainingTimeMs(durationMinutes * 60 * 1000);
+    setIsActive(true);
+  };
+
+  const stopTimer = () => {
+    setIsActive(false);
+    setIsDemoMode(false);
+    setRemainingTimeMs(durationMinutes * 60 * 1000);
+  };
+
+  const changeDuration = (minutes) => {
+    setDurationMinutes(minutes);
+    setRemainingTimeMs(minutes * 60 * 1000);
+    setIsActive(false);
+    setIsFinished(false);
+    setIsDemoMode(false);
+  };
+
+  const startDemo = () => {
+    setIsFinished(false);
+    setIsDemoMode(true);
+    // Use the currently selected duration, but speed it up 100 times
+    const targetEndTime = Date.now() + ((durationMinutes * 60 * 1000) / 100);
+    setEndTime(targetEndTime);
+    setRemainingTimeMs(durationMinutes * 60 * 1000);
+    setIsActive(true);
+  };
+
+  const totalDurationMs = durationMinutes * 60 * 1000;
+  const percentage = Math.max(0, Math.min(100, (remainingTimeMs / totalDurationMs) * 100));
+  
+  // Elephant advances left-to-right from 0% to 100%
+  const elephantPosition = 100 - percentage;
+  const remainingMinutes = remainingTimeMs / (60 * 1000);
+
+  // Styling transitions based on custom constraints:
+  // Green: > 7 mins, Yellow: <= 7 mins, Red: <= 3 mins
+  const getTheme = () => {
+    if (isFinished) return {
+      bar: 'bg-emerald-500',
+      text: 'text-emerald-700',
+      bg: 'bg-emerald-300',
+      cardBg: 'bg-emerald-50',
+      border: 'border-emerald-100',
+      button: 'bg-emerald-500 hover:bg-emerald-600',
+      character: '👑🐘✨',
+      timerText: 'text-emerald-400',
+      timerColon: 'text-emerald-600'
+    };
+    if (remainingMinutes <= 3) return {
+      bar: 'bg-red-500 animate-pulse',
+      text: 'text-red-800 font-extrabold',
+      bg: 'animate-danger-flash',
+      cardBg: 'bg-transparent',
+      border: 'border-red-500',
+      button: 'bg-red-600 hover:bg-red-700',
+      character: '🏃🐘💨',
+      timerText: 'text-red-400',
+      timerColon: 'text-red-600'
+    };
+    if (remainingMinutes <= 7) return {
+      bar: 'bg-amber-400',
+      text: 'text-amber-800 font-bold',
+      bg: 'bg-amber-400',
+      cardBg: 'bg-amber-50',
+      border: 'border-amber-200',
+      button: 'bg-amber-500 hover:bg-amber-600',
+      character: '🧹🐘',
+      timerText: 'text-emerald-400',
+      timerColon: 'text-emerald-600'
+    };
+    return {
+      bar: 'bg-green-400',
+      text: 'text-green-800 font-bold',
+      bg: 'bg-green-400',
+      cardBg: 'bg-green-50',
+      border: 'border-green-200',
+      button: 'bg-green-500 hover:bg-green-600',
+      character: '🐘',
+      timerText: 'text-emerald-400',
+      timerColon: 'text-emerald-600'
+    };
+  };
+
+  const theme = getTheme();
+
+  const getKidsMessage = () => {
+    if (isFinished) return "おわり！ぴっかぴかで きもちいいね！🎉";
+    if (!isActive && percentage === 100) return "じかんを えらんで「スタート」してね！";
+    if (!isActive) return "おやすみちゅう...💤";
+    
+    if (remainingMinutes > 7) return "みんなで ピカピカに しよう！🧹✨";
+    if (remainingMinutes > 3) return "あと 7ぷん！すこし いそごう！🎒";
+    return "あと 3ぷん！さいごの しあげだ！🔥";
+  };
+
+  // タイマー用のフォーマット（残り時間）
+  const formatTimer = (ms) => {
+    const totalSeconds = Math.ceil(ms / 1000);
+    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+    const s = (totalSeconds % 60).toString().padStart(2, '0');
+    return { m, s };
+  };
+
+  const timerDisplay = formatTimer(remainingTimeMs);
+
+  // Calculated target finish time for teachers
+  const getTargetFinishTime = () => {
+    if (!isActive || isFinished) return "--:--";
+    const finishDate = new Date(Date.now() + remainingTimeMs);
+    const h = finishDate.getHours().toString().padStart(2, '0');
+    const m = finishDate.getMinutes().toString().padStart(2, '0');
+    return `${h}:${m}`;
+  };
+
+  return (
+    <div className={`min-h-screen ${theme.bg} transition-colors duration-500 p-4 md:p-8 flex flex-col items-center justify-center font-sans`}>
+      <style>{styles}</style>
+      
+      {/* Upper Dashboard Dashboard Container */}
+      <div className={`w-full max-w-4xl ${theme.cardBg} rounded-3xl shadow-2xl p-6 md:p-10 border-4 ${theme.border} flex flex-col items-center relative overflow-hidden transition-colors duration-500`}>
+        
+        {/* Animated Celebration Background on Finish */}
+        {isFinished && (
+          <div className="absolute inset-0 bg-yellow-100/40 pointer-events-none flex items-center justify-center animate-pulse z-0" />
+        )}
+
+        {/* Top Header & Settings Button */}
+        <div className="w-full flex justify-between items-center mb-6 z-10">
+          <button 
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className="p-3 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all text-slate-600 active:scale-95"
+            title={soundEnabled ? "ミュートにする" : "おとをだす"}
+          >
+            {soundEnabled ? <Volume2 size={24} /> : <VolumeX size={24} className="text-red-500" />}
+          </button>
+
+          <div className="flex items-center space-x-2 text-blue-500">
+            <Sparkles size={28} className="animate-pulse" />
+            <h1 className="text-2xl md:text-4xl font-black tracking-wider text-slate-800">おそうじ タイマー</h1>
+            <Sparkles size={28} className="animate-pulse" />
+          </div>
+
+          <button 
+            onClick={() => setShowSettings(!showSettings)}
+            className={`p-3 rounded-2xl transition-all active:scale-95 ${showSettings ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
+          >
+            <Settings size={24} />
+          </button>
+        </div>
+
+        {/* Countdown Timer Section (Replaced Digital Clock) */}
+        <div className="flex flex-col items-center mb-8 z-10">
+          <div className="text-xs md:text-sm font-bold text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1 bg-white/80 px-3 py-1 rounded-full">
+            <Timer size={16} /> のこりじかん
+          </div>
+          <div className={`bg-slate-900 ${theme.timerText} px-8 py-3 rounded-2xl shadow-inner border-4 border-slate-800 flex items-baseline justify-center font-mono select-none w-64 md:w-80 transition-colors duration-300`}>
+            <span className="text-6xl md:text-8xl font-black tracking-widest">{timerDisplay.m}</span>
+            <span className={`text-4xl md:text-6xl font-black mx-2 pb-2 ${theme.timerColon} ${isActive && !isFinished ? 'animate-pulse' : ''}`}>:</span>
+            <span className="text-6xl md:text-8xl font-black tracking-widest">{timerDisplay.s}</span>
+          </div>
+        </div>
+
+        {/* Dynamic Speech Message Bubble */}
+        <div className="w-full max-w-2xl h-24 md:h-28 flex items-center justify-center z-10 mb-2">
+          <div className="bg-white/95 rounded-2xl border-4 border-slate-200 px-6 py-4 shadow-md relative w-full text-center">
+            <p className={`text-2xl md:text-4xl font-extrabold transition-all duration-300 ${theme.text}`}>
+              {getKidsMessage()}
+            </p>
+            <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-6 h-6 bg-white border-r-4 border-b-4 border-slate-200 rotate-45"></div>
+          </div>
+        </div>
+
+        {}
+        {/* Visual Road / Path */}
+        <div className="w-full relative z-10 py-12 px-6 md:px-12 mt-4 bg-slate-50/60 rounded-3xl border-2 border-dashed border-slate-200">
+          
+          <div className="relative w-full">
+            {/* Start point sign */}
+            <div className="absolute left-0 top-0 text-xs md:text-sm font-bold text-slate-400 transform -translate-y-8 -translate-x-4">
+              🏠 スタート
+            </div>
+
+            {/* Goal flag */}
+            <div className="absolute right-0 top-0 text-4xl md:text-6xl z-50 transform -translate-y-12 md:-translate-y-16 translate-x-4 md:translate-x-6 animate-bounce">
+              🏁
+              <span className="absolute -top-6 right-0 text-xs font-black text-red-500 bg-white px-1.5 py-0.5 rounded-full border border-red-200 shadow-sm whitespace-nowrap">
+                ゴール！
+              </span>
+            </div>
+
+            {/* Cute Elephant Character Container */}
+            <div 
+              className="absolute top-0 z-30 transition-all duration-200 ease-out"
+              style={{ 
+                left: `calc(${elephantPosition}% - 2.5rem)`, 
+                transform: 'translateY(-60%)'
+              }}
+            >
+              <div className={`text-5xl md:text-7xl select-none flex flex-col items-center ${isActive ? 'animate-wiggle' : 'animate-float'}`}>
+                <span className="inline-block transform scale-x-[-1]">{theme.character}</span>
+              </div>
+              
+              {/* Puff dust particles when walking */}
+              {isActive && (
+                <div className="absolute -bottom-1 -left-2 text-lg animate-ping opacity-60">💨</div>
+              )}
+            </div>
+
+            {/* Progress Track & Segment Grid */}
+            <div className="w-full h-[72px] md:h-24 bg-slate-200 rounded-3xl md:rounded-[2rem] p-2.5 md:p-3 shadow-inner relative overflow-hidden flex items-center justify-end">
+              
+              {/* Progress Colored Fill (Shrinks to the right, erased from the left) */}
+              <div 
+                className={`h-full rounded-2xl transition-all duration-200 ease-linear ${theme.bar} shadow-lg relative z-10 flex items-center`}
+                style={{ width: `${percentage}%` }}
+              >
+                {/* Shiny highlight overlay inside the progress bar */}
+                <div className="w-full h-1/2 bg-white/20 absolute top-0 rounded-t-2xl" />
+              </div>
+
+              {/* Dynamic 1-minute Segment Dividers (Moved to FRONT layer) */}
+              <div className="absolute inset-0 py-2 px-3 flex justify-evenly items-center z-20 pointer-events-none">
+                {Array.from({ length: durationMinutes - 1 }).map((_, i) => (
+                  <div 
+                    key={i} 
+                    className="h-full w-1.5 bg-white/80 shadow-sm rounded-full mix-blend-overlay" 
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Remaining Minutes Marks (Under the bar) */}
+            <div className="w-full flex justify-between px-1 mt-2 text-xs md:text-sm font-bold text-slate-400">
+              <span>おわり</span>
+              <span className="font-black text-slate-500">おそうじタイム： {durationMinutes}ぷん</span>
+              <span>はじめ</span>
+            </div>
+          </div>
+        </div>
+
+        {}
+        {/* Core Controls Section */}
+        <div className="flex flex-col items-center gap-4 z-10 w-full mt-6">
+          <div className="flex justify-center gap-4 w-full">
+            {!isActive ? (
+              <button 
+                onClick={startTimer}
+                className="flex items-center justify-center space-x-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-12 py-5 rounded-3xl text-2xl md:text-3xl font-black shadow-xl hover:shadow-2xl active:scale-95 transition-all w-full max-w-md"
+              >
+                <Play size={32} className="fill-current" />
+                <span>スタート！</span>
+              </button>
+            ) : (
+              <button 
+                onClick={stopTimer}
+                className="flex items-center justify-center space-x-3 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white px-12 py-5 rounded-3xl text-2xl md:text-3xl font-black shadow-xl hover:shadow-2xl active:scale-95 transition-all w-full max-w-md"
+              >
+                <Square size={28} className="fill-current" />
+                <span>ストップ</span>
+              </button>
+            )}
+          </div>
+
+          {/* Teacher Info Panel (Target Finish time based on selection) */}
+          {isActive && !isFinished && (
+            <div className="text-slate-500 text-xs md:text-sm bg-slate-50 border border-slate-100 rounded-full px-4 py-1 flex items-center gap-1.5 font-bold">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              先生用：このまま進むと <strong className="text-slate-700 text-base">{getTargetFinishTime()}</strong> 頃にお掃除が終わります。
+            </div>
+          )}
+        </div>
+
+        {}
+        {/* Settings Toggle Drawer */}
+        {showSettings && (
+          <div className="w-full mt-8 p-6 bg-slate-50 rounded-2xl border-2 border-slate-100 flex flex-col items-center space-y-4 animate-float">
+            <div className="flex items-center gap-1.5 border-b pb-2 w-full justify-center">
+              <Settings size={18} className="text-slate-500" />
+              <span className="font-extrabold text-slate-700 text-lg">設定（おそうじの時間）</span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 w-full">
+              {[10, 15, 20, 25].map((min) => (
+                <button
+                  key={min}
+                  onClick={() => changeDuration(min)}
+                  className={`py-3 px-4 rounded-xl font-black text-xl border-2 flex items-center justify-center gap-2 transition-all ${
+                    durationMinutes === min 
+                      ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
+                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  {durationMinutes === min && <Check size={20} />}
+                  <span>{min} 分</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Quick Informational note */}
+            <div className="flex items-start gap-2 bg-blue-50/50 p-3 rounded-xl border border-blue-100/60 text-xs text-slate-500 text-left w-full">
+              <Info size={16} className="text-blue-500 shrink-0 mt-0.5" />
+              <p>
+                お掃除の時間を変えると、1マス辺りの長さが自動的に変化します（10分だと広く、25分だと狭くなります）。残り時間 <strong>7分で黄色</strong>、<strong>3分で赤色</strong>に変わります。
+              </p>
+            </div>
+
+            {/* Teacher Fast Testing Area */}
+            <div className="border-t border-slate-200 pt-4 w-full text-center">
+              <span className="text-xs font-bold text-slate-400 block mb-2">先生用のデモ再生（100倍のスピードで進みます）</span>
+              <button 
+                onClick={startDemo}
+                disabled={isActive}
+                className="inline-flex items-center space-x-1.5 bg-slate-200 hover:bg-slate-300 disabled:opacity-50 text-slate-700 px-4 py-2 rounded-xl text-xs font-extrabold transition-all"
+              >
+                <Timer size={14} />
+                <span>デモ(高速テスト)を開始</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
