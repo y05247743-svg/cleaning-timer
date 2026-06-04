@@ -1,406 +1,514 @@
-import React, { useState, useEffect, useRef } from 'react';
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>おそうじタイマー</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes wiggle {
+      0%, 100% { transform: rotate(-5deg) translateY(-60%); }
+      50% { transform: rotate(5deg) translateY(-70%); }
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    @keyframes dangerFlash {
+      0%, 100% { background-color: #ffffff; }
+      50% { background-color: #ef4444; }
+    }
+    .animate-wiggle {
+      animation: wiggle 0.5s ease-in-out infinite;
+    }
+    .animate-float {
+      animation: float 3s ease-in-out infinite;
+    }
+    .animate-danger-flash {
+      animation: dangerFlash 2s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+  <div id="app-container" class="min-h-screen transition-colors duration-500 p-4 md:p-6 flex flex-col items-center justify-center font-sans">
+    
+    <!-- メインコンテナ -->
+    <div id="main-card" class="w-full max-w-6xl flex-grow flex flex-col justify-between rounded-[2.5rem] shadow-2xl p-6 md:p-10 border-4 relative overflow-hidden transition-colors duration-500">
+      
+      <!-- 終了時のエフェクト -->
+      <div id="finish-overlay" class="absolute inset-0 bg-yellow-100/40 pointer-events-none flex items-center justify-center animate-pulse z-0 hidden"></div>
 
-// カスタムアニメーション
-const customStyles = `
-@keyframes wiggle {
-  0%, 100% { transform: rotate(-5deg) translateY(-60%); }
-  50% { transform: rotate(5deg) translateY(-70%); }
-}
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
-}
-@keyframes dangerFlash {
-  0%, 100% { background-color: #ffffff; }
-  50% { background-color: #ef4444; }
-}
-.animate-wiggle {
-  animation: wiggle 0.5s ease-in-out infinite;
-}
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-.animate-danger-flash {
-  animation: dangerFlash 2s ease-in-out infinite;
-}
-`;
+      <!-- ヘッダーエリア -->
+      <div class="w-full flex justify-between items-center z-10 shrink-0">
+        <button id="btn-sound" class="p-4 md:p-5 bg-slate-100 hover:bg-slate-200 rounded-2xl md:rounded-3xl transition-all text-slate-600 active:scale-95 text-2xl">
+          🔊 おとあり
+        </button>
 
-export default function App() {
-  const [isActive, setIsActive] = useState(false);
-  const [durationMinutes, setDurationMinutes] = useState(15);
-  const [remainingTimeMs, setRemainingTimeMs] = useState(15 * 60 * 1000);
-  const [endTime, setEndTime] = useState(null);
-  const [isFinished, setIsFinished] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
-  
-  // 先生のテスト用モード（100倍速）
-  const [isDemoMode, setIsDemoMode] = useState(false);
+        <div class="flex items-center space-x-3 text-blue-500">
+          <span class="text-3xl animate-pulse hidden md:block">✨</span>
+          <h1 class="text-3xl md:text-5xl lg:text-6xl font-black tracking-wider text-slate-800">おそうじ タイマー</h1>
+          <span class="text-3xl animate-pulse hidden md:block">✨</span>
+        </div>
 
-  useEffect(() => {
+        <button id="btn-settings" class="p-4 md:p-5 rounded-2xl md:rounded-3xl transition-all active:scale-95 text-2xl bg-slate-100 hover:bg-slate-200 text-slate-600">
+          ⚙️ せってい
+        </button>
+      </div>
+
+      <!-- 設定パネル（オーバーレイ表示） -->
+      <div id="settings-modal" class="hidden absolute top-28 left-1/2 transform -translate-x-1/2 w-[90%] max-w-3xl p-8 bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-4 border-slate-200 z-50 animate-float">
+        <div class="flex items-center gap-2 border-b-2 pb-4 mb-6 w-full justify-center">
+          <span class="font-black text-slate-700 text-2xl">⚙️ おそうじの時間をえらぶ</span>
+        </div>
+        <div id="duration-buttons" class="grid grid-cols-2 md:grid-cols-4 gap-4 w-full mb-6">
+          <!-- JSで動的に生成 -->
+        </div>
+        <div class="border-t-2 border-slate-100 pt-6 flex justify-between items-center">
+          <button id="btn-close-settings" class="text-slate-500 hover:text-slate-700 font-bold text-lg px-6 py-3 bg-slate-100 rounded-xl">
+            とじる
+          </button>
+          <button id="btn-demo" class="inline-flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md">
+            <span>⏱️ 先生用：高速テスト(100倍速)</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 巨大デジタルタイマー -->
+      <div class="flex flex-col items-center justify-center flex-grow z-10 py-4">
+        <div class="text-base md:text-xl font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2 bg-white/80 px-6 py-2 rounded-full shadow-sm">
+          <span>⏱️</span> のこりじかん
+        </div>
+        <div id="timer-container" class="bg-slate-900 px-8 md:px-16 py-4 md:py-6 rounded-[2rem] shadow-inner border-8 border-slate-800 flex items-baseline justify-center font-mono select-none w-[95%] md:w-auto transition-colors duration-300">
+          <span id="timer-m" class="text-[6rem] md:text-[10rem] lg:text-[13rem] font-black tracking-widest leading-none drop-shadow-md">15</span>
+          <span id="timer-colon" class="text-[4rem] md:text-[7rem] lg:text-[9rem] font-black mx-2 md:mx-6 pb-4 md:pb-8 leading-none">:</span>
+          <span id="timer-s" class="text-[6rem] md:text-[10rem] lg:text-[13rem] font-black tracking-widest leading-none drop-shadow-md">00</span>
+        </div>
+      </div>
+
+      <!-- 吹き出しメッセージ -->
+      <div class="w-full flex items-center justify-center z-10 mb-6 shrink-0">
+        <div class="bg-white/95 rounded-3xl border-4 border-slate-200 px-8 py-6 shadow-lg relative w-11/12 max-w-4xl text-center">
+          <p id="message-text" class="text-3xl md:text-5xl lg:text-6xl font-black transition-all duration-300">
+            じかんをえらんで「スタート」してね！
+          </p>
+          <div class="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-white border-r-4 border-b-4 border-slate-200 rotate-45"></div>
+        </div>
+      </div>
+
+      <!-- ゲージとゾウさん（メーター部分） -->
+      <div class="w-full relative z-10 py-12 md:py-16 px-6 md:px-16 mt-2 bg-slate-50/70 rounded-[2.5rem] border-4 border-dashed border-slate-300 shrink-0">
+        <div class="relative w-full">
+          <div class="absolute left-0 top-0 text-sm md:text-xl font-black text-slate-400 transform -translate-y-10 md:-translate-y-12 -translate-x-2">
+            🏠 スタート
+          </div>
+
+          <div class="absolute right-0 top-0 text-5xl md:text-7xl lg:text-8xl z-50 transform -translate-y-14 md:-translate-y-20 translate-x-4 md:translate-x-8 animate-bounce">
+            🏁
+            <span class="absolute -top-8 right-0 text-sm md:text-lg font-black text-red-500 bg-white px-3 py-1 rounded-full border-2 border-red-200 shadow-md whitespace-nowrap">
+              ゴール！
+            </span>
+          </div>
+
+          <!-- キャラクター -->
+          <div id="elephant-container" class="absolute top-0 z-30 transition-all duration-200 ease-out animate-float" style="left: calc(0% - 3rem); transform: translateY(-60%);">
+            <div class="text-7xl md:text-8xl lg:text-9xl select-none flex flex-col items-center">
+              <span id="elephant-text" class="inline-block transform scale-x-[-1] drop-shadow-xl">🐘</span>
+            </div>
+            <div id="dust-effect" class="hidden absolute -bottom-2 -left-4 text-3xl md:text-4xl animate-ping opacity-60">💨</div>
+          </div>
+
+          <!-- メーター本体 -->
+          <div class="w-full h-[80px] md:h-[120px] bg-slate-200 rounded-[3rem] p-3 md:p-4 shadow-inner relative overflow-hidden flex items-center justify-end">
+            <div id="progress-bar" class="h-full rounded-[2rem] transition-all duration-200 ease-linear shadow-lg relative z-10 flex items-center" style="width: 100%;">
+              <div class="w-full h-1/2 bg-white/20 absolute top-0 rounded-t-[2rem]"></div>
+            </div>
+
+            <!-- 1分ごとの区切り線 -->
+            <div id="dividers-container" class="absolute inset-0 py-3 md:py-4 px-4 flex justify-evenly items-center z-20 pointer-events-none">
+              <!-- JSで動的に生成 -->
+            </div>
+          </div>
+
+          <div class="w-full flex justify-between px-2 mt-4 text-sm md:text-xl font-black text-slate-400">
+            <span>おわり</span>
+            <span id="duration-display" class="text-slate-500 bg-slate-200 px-4 py-1 rounded-full">おそうじタイム： 15ぷん</span>
+            <span>はじめ</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- コントロールボタン -->
+      <div class="flex flex-col items-center gap-4 z-10 w-full mt-6 shrink-0">
+        <div class="flex justify-center w-full">
+          <button id="btn-start" class="flex items-center justify-center space-x-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-12 md:px-24 py-6 md:py-8 rounded-[2.5rem] text-3xl md:text-5xl lg:text-6xl font-black shadow-2xl active:scale-95 transition-transform w-full md:w-auto">
+            <span>▶ スタート！</span>
+          </button>
+          
+          <button id="btn-stop" class="hidden flex items-center justify-center space-x-4 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white px-12 md:px-24 py-6 md:py-8 rounded-[2.5rem] text-3xl md:text-5xl lg:text-6xl font-black shadow-2xl active:scale-95 transition-transform w-full md:w-auto">
+            <span>■ ストップ</span>
+          </button>
+        </div>
+
+        <!-- 先生用：終了予想時刻 -->
+        <div id="finish-time-container" class="hidden text-slate-500 text-sm md:text-lg bg-white border-2 border-slate-100 rounded-full px-6 py-2 flex items-center gap-2 font-bold shadow-sm">
+          <span class="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></span>
+          先生用：このまま進むと <strong id="finish-time-text" class="text-slate-800 text-xl md:text-2xl">--:--</strong> 頃にお掃除が終わります。
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // State
+    let isActive = false;
+    let durationMinutes = 15;
+    let remainingTimeMs = 15 * 60 * 1000;
+    let endTime = null;
+    let isFinished = false;
+    let soundEnabled = true;
+    let isDemoMode = false;
     let timerInterval = null;
 
-    if (isActive && endTime) {
-      const speedMultiplier = isDemoMode ? 100 : 1;
+    // DOM Elements
+    const appContainer = document.getElementById('app-container');
+    const mainCard = document.getElementById('main-card');
+    const finishOverlay = document.getElementById('finish-overlay');
+    const btnSound = document.getElementById('btn-sound');
+    const btnSettings = document.getElementById('btn-settings');
+    const settingsModal = document.getElementById('settings-modal');
+    const durationButtonsContainer = document.getElementById('duration-buttons');
+    const btnCloseSettings = document.getElementById('btn-close-settings');
+    const btnDemo = document.getElementById('btn-demo');
+    const timerContainer = document.getElementById('timer-container');
+    const timerM = document.getElementById('timer-m');
+    const timerS = document.getElementById('timer-s');
+    const timerColon = document.getElementById('timer-colon');
+    const messageText = document.getElementById('message-text');
+    const elephantContainer = document.getElementById('elephant-container');
+    const elephantText = document.getElementById('elephant-text');
+    const dustEffect = document.getElementById('dust-effect');
+    const progressBar = document.getElementById('progress-bar');
+    const dividersContainer = document.getElementById('dividers-container');
+    const durationDisplay = document.getElementById('duration-display');
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+    const finishTimeContainer = document.getElementById('finish-time-container');
+    const finishTimeText = document.getElementById('finish-time-text');
 
+    // Themes (React版と同様)
+    const themes = {
+      finished: {
+        bar: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-300', cardBg: 'bg-emerald-50', border: 'border-emerald-100', character: '👑🐘✨', timerText: 'text-emerald-400', timerColon: 'text-emerald-600'
+      },
+      danger: {
+        bar: 'bg-red-500 animate-pulse', text: 'text-red-800 font-extrabold', bg: 'animate-danger-flash', cardBg: 'bg-transparent', border: 'border-red-500', character: '🏃🐘💨', timerText: 'text-red-400', timerColon: 'text-red-600'
+      },
+      warning: {
+        bar: 'bg-amber-400', text: 'text-amber-800 font-bold', bg: 'bg-amber-400', cardBg: 'bg-amber-50', border: 'border-amber-200', character: '🧹🐘', timerText: 'text-amber-300', timerColon: 'text-amber-500'
+      },
+      normal: {
+        bar: 'bg-green-400', text: 'text-green-800 font-bold', bg: 'bg-green-400', cardBg: 'bg-green-50', border: 'border-green-200', character: '🐘', timerText: 'text-emerald-400', timerColon: 'text-emerald-600'
+      }
+    };
+
+    // Class lists for replacement
+    const bgClasses = ['bg-emerald-300', 'animate-danger-flash', 'bg-amber-400', 'bg-green-400'];
+    const cardBgClasses = ['bg-emerald-50', 'bg-transparent', 'bg-amber-50', 'bg-green-50'];
+    const borderClasses = ['border-emerald-100', 'border-red-500', 'border-amber-200', 'border-green-200'];
+    const textClasses = ['text-emerald-700', 'text-red-800', 'text-amber-800', 'text-green-800', 'font-extrabold', 'font-bold'];
+    const timerTextClasses = ['text-emerald-400', 'text-red-400', 'text-amber-300'];
+    const timerColonClasses = ['text-emerald-600', 'text-red-600', 'text-amber-500'];
+    const barClasses = ['bg-emerald-500', 'bg-red-500', 'animate-pulse', 'bg-amber-400', 'bg-green-400'];
+
+    // 初期化
+    initDurationButtons();
+    updateDividers();
+    updateUI();
+
+    // 音声チャイム
+    function playFinishedChime() {
+      if (!soundEnabled) return;
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        
+        const playNote = (freq, startTime, duration) => {
+          const osc = ctx.createOscillator();
+          const gainNode = ctx.createGain();
+          
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, startTime);
+          
+          gainNode.gain.setValueAtTime(0.2, startTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration - 0.02);
+          
+          osc.connect(gainNode);
+          gainNode.connect(ctx.destination);
+          
+          osc.start(startTime);
+          osc.stop(startTime + duration);
+        };
+
+        const now = ctx.currentTime;
+        playNote(523.25, now, 0.25);
+        playNote(659.25, now + 0.15, 0.25);
+        playNote(783.99, now + 0.30, 0.25);
+        playNote(1046.50, now + 0.45, 0.8);
+      } catch (e) {
+        console.warn("Audio Context could not play:", e);
+      }
+    }
+
+    // タイマー制御
+    function startTimerLoop() {
+      if (timerInterval) clearInterval(timerInterval);
+      
+      const speedMultiplier = isDemoMode ? 100 : 1;
+      
       timerInterval = setInterval(() => {
         const now = Date.now();
         let nextRemaining = (endTime - now) * speedMultiplier;
-
+        
         if (!isDemoMode) {
           nextRemaining = endTime - now;
         }
 
         if (nextRemaining <= 0) {
-          setRemainingTimeMs(0);
-          setIsActive(false);
-          setIsFinished(true);
+          remainingTimeMs = 0;
+          isActive = false;
+          isFinished = true;
           playFinishedChime();
           clearInterval(timerInterval);
         } else {
-          setRemainingTimeMs(nextRemaining);
+          remainingTimeMs = nextRemaining;
         }
+        updateUI();
       }, 100);
-    } else {
+    }
+
+    // イベントリスナー
+    btnStart.addEventListener('click', () => {
+      isFinished = false;
+      settingsModal.classList.add('hidden');
+      btnSettings.classList.replace('bg-blue-100', 'bg-slate-100');
+      btnSettings.classList.replace('text-blue-600', 'text-slate-600');
+      
+      endTime = Date.now() + (durationMinutes * 60 * 1000);
+      remainingTimeMs = durationMinutes * 60 * 1000;
+      isActive = true;
+      startTimerLoop();
+      updateUI();
+    });
+
+    btnStop.addEventListener('click', () => {
+      isActive = false;
+      isDemoMode = false;
+      remainingTimeMs = durationMinutes * 60 * 1000;
       clearInterval(timerInterval);
+      updateUI();
+    });
+
+    btnSound.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      btnSound.innerHTML = soundEnabled ? "🔊 おとあり" : "🔇 おとなし";
+    });
+
+    btnSettings.addEventListener('click', () => {
+      const isHidden = settingsModal.classList.contains('hidden');
+      if (isHidden) {
+        settingsModal.classList.remove('hidden');
+        btnSettings.classList.replace('bg-slate-100', 'bg-blue-100');
+        btnSettings.classList.replace('text-slate-600', 'text-blue-600');
+      } else {
+        settingsModal.classList.add('hidden');
+        btnSettings.classList.replace('bg-blue-100', 'bg-slate-100');
+        btnSettings.classList.replace('text-blue-600', 'text-slate-600');
+      }
+    });
+
+    btnCloseSettings.addEventListener('click', () => {
+      settingsModal.classList.add('hidden');
+      btnSettings.classList.replace('bg-blue-100', 'bg-slate-100');
+      btnSettings.classList.replace('text-blue-600', 'text-slate-600');
+    });
+
+    btnDemo.addEventListener('click', () => {
+      isFinished = false;
+      isDemoMode = true;
+      endTime = Date.now() + ((durationMinutes * 60 * 1000) / 100);
+      remainingTimeMs = durationMinutes * 60 * 1000;
+      isActive = true;
+      settingsModal.classList.add('hidden');
+      startTimerLoop();
+      updateUI();
+    });
+
+    function changeDuration(minutes) {
+      durationMinutes = minutes;
+      remainingTimeMs = minutes * 60 * 1000;
+      isActive = false;
+      isFinished = false;
+      isDemoMode = false;
+      clearInterval(timerInterval);
+      initDurationButtons();
+      updateDividers();
+      updateUI();
     }
 
-    return () => clearInterval(timerInterval);
-  }, [isActive, endTime, isDemoMode]);
-
-  // 終了時のチャイム音
-  const playFinishedChime = () => {
-    if (!soundEnabled) return;
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!AudioContext) return;
-      const ctx = new AudioContext();
-      
-      const playNote = (freq, startTime, duration) => {
-        const osc = ctx.createOscillator();
-        const gainNode = ctx.createGain();
+    // 動的UI生成
+    function initDurationButtons() {
+      durationButtonsContainer.innerHTML = '';
+      [10, 15, 20, 25].forEach(min => {
+        const btn = document.createElement('button');
+        const isSelected = durationMinutes === min;
         
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, startTime);
+        btn.className = `py-6 px-4 rounded-2xl font-black text-3xl md:text-4xl border-4 flex flex-col items-center justify-center gap-2 transition-all ${
+          isSelected 
+            ? 'bg-blue-500 border-blue-600 text-white shadow-lg transform scale-105' 
+            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+        }`;
         
-        gainNode.gain.setValueAtTime(0.2, startTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration - 0.02);
+        btn.innerHTML = `
+          <span>${min} <span class="text-xl md:text-2xl">分</span></span>
+          ${isSelected ? '<span class="text-2xl">✅</span>' : ''}
+        `;
         
-        osc.connect(gainNode);
-        gainNode.connect(ctx.destination);
-        
-        osc.start(startTime);
-        osc.stop(startTime + duration);
-      };
-
-      const now = ctx.currentTime;
-      playNote(523.25, now, 0.25);      // ド
-      playNote(659.25, now + 0.15, 0.25); // ミ
-      playNote(783.99, now + 0.30, 0.25); // ソ
-      playNote(1046.50, now + 0.45, 0.8); // ド（高）
-    } catch (e) {
-      console.warn("Audio Context could not play:", e);
+        btn.onclick = () => changeDuration(min);
+        durationButtonsContainer.appendChild(btn);
+      });
     }
-  };
 
-  const startTimer = () => {
-    setIsFinished(false);
-    setShowSettings(false);
-    const targetEndTime = Date.now() + (durationMinutes * 60 * 1000);
-    setEndTime(targetEndTime);
-    setRemainingTimeMs(durationMinutes * 60 * 1000);
-    setIsActive(true);
-  };
+    function updateDividers() {
+      dividersContainer.innerHTML = '';
+      for (let i = 0; i < durationMinutes - 1; i++) {
+        const div = document.createElement('div');
+        div.className = 'h-full w-2 md:w-3 bg-white/90 shadow-sm rounded-full mix-blend-overlay';
+        dividersContainer.appendChild(div);
+      }
+    }
 
-  const stopTimer = () => {
-    setIsActive(false);
-    setIsDemoMode(false);
-    setRemainingTimeMs(durationMinutes * 60 * 1000);
-  };
+    // ユーティリティ
+    function formatTimer(ms) {
+      const totalSeconds = Math.ceil(ms / 1000);
+      const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+      const s = (totalSeconds % 60).toString().padStart(2, '0');
+      return { m, s };
+    }
 
-  const changeDuration = (minutes) => {
-    setDurationMinutes(minutes);
-    setRemainingTimeMs(minutes * 60 * 1000);
-    setIsActive(false);
-    setIsFinished(false);
-    setIsDemoMode(false);
-  };
+    function getTargetFinishTime() {
+      if (!isActive || isFinished) return "--:--";
+      const finishDate = new Date(Date.now() + remainingTimeMs);
+      const h = finishDate.getHours().toString().padStart(2, '0');
+      const m = finishDate.getMinutes().toString().padStart(2, '0');
+      return `${h}:${m}`;
+    }
 
-  const startDemo = () => {
-    setIsFinished(false);
-    setIsDemoMode(true);
-    const targetEndTime = Date.now() + ((durationMinutes * 60 * 1000) / 100);
-    setEndTime(targetEndTime);
-    setRemainingTimeMs(durationMinutes * 60 * 1000);
-    setIsActive(true);
-    setShowSettings(false);
-  };
+    function removeClasses(element, classArray) {
+      classArray.forEach(cls => {
+        // "animate-pulse" などの複合クラスに対応するため split する
+        cls.split(' ').forEach(c => element.classList.remove(c));
+      });
+    }
 
-  const totalDurationMs = durationMinutes * 60 * 1000;
-  const percentage = Math.max(0, Math.min(100, (remainingTimeMs / totalDurationMs) * 100));
-  
-  // ゾウさんの位置
-  const elephantPosition = 100 - percentage;
-  const remainingMinutes = remainingTimeMs / (60 * 1000);
+    function addClasses(element, classesString) {
+      classesString.split(' ').forEach(c => {
+        if(c) element.classList.add(c);
+      });
+    }
 
-  // 時間に応じたテーマ変更
-  const getTheme = () => {
-    if (isFinished) return {
-      bar: 'bg-emerald-500',
-      text: 'text-emerald-700',
-      bg: 'bg-emerald-300',
-      cardBg: 'bg-emerald-50',
-      border: 'border-emerald-100',
-      character: '👑🐘✨',
-      timerText: 'text-emerald-400',
-      timerColon: 'text-emerald-600'
-    };
-    if (remainingMinutes <= 3) return {
-      bar: 'bg-red-500 animate-pulse',
-      text: 'text-red-800 font-extrabold',
-      bg: 'animate-danger-flash',
-      cardBg: 'bg-transparent',
-      border: 'border-red-500',
-      character: '🏃🐘💨',
-      timerText: 'text-red-400',
-      timerColon: 'text-red-600'
-    };
-    if (remainingMinutes <= 7) return {
-      bar: 'bg-amber-400',
-      text: 'text-amber-800 font-bold',
-      bg: 'bg-amber-400',
-      cardBg: 'bg-amber-50',
-      border: 'border-amber-200',
-      character: '🧹🐘',
-      timerText: 'text-amber-300',
-      timerColon: 'text-amber-500'
-    };
-    return {
-      bar: 'bg-green-400',
-      text: 'text-green-800 font-bold',
-      bg: 'bg-green-400',
-      cardBg: 'bg-green-50',
-      border: 'border-green-200',
-      character: '🐘',
-      timerText: 'text-emerald-400',
-      timerColon: 'text-emerald-600'
-    };
-  };
+    // UI更新ループ
+    function updateUI() {
+      const totalDurationMs = durationMinutes * 60 * 1000;
+      const percentage = Math.max(0, Math.min(100, (remainingTimeMs / totalDurationMs) * 100));
+      const elephantPosition = 100 - percentage;
+      const remainingMinutes = remainingTimeMs / (60 * 1000);
 
-  const theme = getTheme();
+      // テーマ決定
+      let theme;
+      if (isFinished) theme = themes.finished;
+      else if (remainingMinutes <= 3) theme = themes.danger;
+      else if (remainingMinutes <= 7) theme = themes.warning;
+      else theme = themes.normal;
 
-  const getKidsMessage = () => {
-    if (isFinished) return "おわり！ぴっかぴかで きもちいいね！🎉";
-    if (!isActive && percentage === 100) return "じかんをえらんで「スタート」してね！";
-    if (!isActive) return "おやすみちゅう...💤";
-    
-    if (remainingMinutes > 7) return "みんなで ピカピカに しよう！🧹✨";
-    if (remainingMinutes > 3) return "あと 7ぷん！すこし いそごう！🎒";
-    return "あと 3ぷん！さいごの しあげだ！🔥";
-  };
+      // 背景色などの更新
+      removeClasses(appContainer, bgClasses);
+      addClasses(appContainer, theme.bg);
 
-  const formatTimer = (ms) => {
-    const totalSeconds = Math.ceil(ms / 1000);
-    const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-    const s = (totalSeconds % 60).toString().padStart(2, '0');
-    return { m, s };
-  };
+      removeClasses(mainCard, cardBgClasses);
+      addClasses(mainCard, theme.cardBg);
 
-  const timerDisplay = formatTimer(remainingTimeMs);
+      removeClasses(mainCard, borderClasses);
+      addClasses(mainCard, theme.border);
 
-  const getTargetFinishTime = () => {
-    if (!isActive || isFinished) return "--:--";
-    const finishDate = new Date(Date.now() + remainingTimeMs);
-    const h = finishDate.getHours().toString().padStart(2, '0');
-    const m = finishDate.getMinutes().toString().padStart(2, '0');
-    return `${h}:${m}`;
-  };
+      // 終了エフェクト
+      if (isFinished) finishOverlay.classList.remove('hidden');
+      else finishOverlay.classList.add('hidden');
 
-  return (
-    <div className={`min-h-screen ${theme.bg} transition-colors duration-500 p-4 md:p-6 flex flex-col items-center justify-center font-sans`}>
-      {/* 安全にCSSスタイルを適用 */}
-      <style dangerouslySetInnerHTML={{ __html: customStyles }} />
+      // タイマーテキスト更新
+      const timeParts = formatTimer(remainingTimeMs);
+      timerM.textContent = timeParts.m;
+      timerS.textContent = timeParts.s;
+
+      removeClasses(timerContainer, timerTextClasses);
+      addClasses(timerContainer, theme.timerText);
+      removeClasses(timerColon, timerColonClasses);
+      addClasses(timerColon, theme.timerColon);
       
-      {/* iPad向けに幅を広げたメインコンテナ */}
-      <div className={`w-full max-w-6xl flex-grow flex flex-col justify-between ${theme.cardBg} rounded-[2.5rem] shadow-2xl p-6 md:p-10 border-4 ${theme.border} relative overflow-hidden transition-colors duration-500`}>
-        
-        {isFinished && (
-          <div className="absolute inset-0 bg-yellow-100/40 pointer-events-none flex items-center justify-center animate-pulse z-0" />
-        )}
+      if (isActive && !isFinished) timerColon.classList.add('animate-pulse');
+      else timerColon.classList.remove('animate-pulse');
 
-        {/* ヘッダーエリア */}
-        <div className="w-full flex justify-between items-center z-10 shrink-0">
-          <button 
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="p-4 md:p-5 bg-slate-100 hover:bg-slate-200 rounded-2xl md:rounded-3xl transition-all text-slate-600 active:scale-95 text-2xl"
-          >
-            {soundEnabled ? "🔊 おとあり" : "🔇 おとなし"}
-          </button>
+      // メッセージ更新
+      let kidsMsg = "";
+      if (isFinished) kidsMsg = "おわり！ぴっかぴかで きもちいいね！🎉";
+      else if (!isActive && percentage === 100) kidsMsg = "じかんをえらんで「スタート」してね！";
+      else if (!isActive) kidsMsg = "おやすみちゅう...💤";
+      else if (remainingMinutes > 7) kidsMsg = "みんなで ピカピカに しよう！🧹✨";
+      else if (remainingMinutes > 3) kidsMsg = "あと 7ぷん！すこし いそごう！🎒";
+      else kidsMsg = "あと 3ぷん！さいごの しあげだ！🔥";
 
-          <div className="flex items-center space-x-3 text-blue-500">
-            <span className="text-3xl animate-pulse hidden md:block">✨</span>
-            <h1 className="text-3xl md:text-5xl lg:text-6xl font-black tracking-wider text-slate-800">おそうじ タイマー</h1>
-            <span className="text-3xl animate-pulse hidden md:block">✨</span>
-          </div>
+      messageText.textContent = kidsMsg;
+      removeClasses(messageText, textClasses);
+      addClasses(messageText, theme.text);
 
-          <button 
-            onClick={() => setShowSettings(!showSettings)}
-            className={`p-4 md:p-5 rounded-2xl md:rounded-3xl transition-all active:scale-95 text-2xl ${showSettings ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
-          >
-            ⚙️ せってい
-          </button>
-        </div>
+      // ゾウさんの更新
+      elephantContainer.style.left = `calc(${elephantPosition}% - 3rem)`;
+      elephantText.textContent = theme.character;
+      
+      if (isActive) {
+        elephantContainer.classList.add('animate-wiggle');
+        elephantContainer.classList.remove('animate-float');
+        dustEffect.classList.remove('hidden');
+      } else {
+        elephantContainer.classList.remove('animate-wiggle');
+        elephantContainer.classList.add('animate-float');
+        dustEffect.classList.add('hidden');
+      }
 
-        {/* 設定パネル（オーバーレイ表示） */}
-        {showSettings && (
-          <div className="absolute top-28 left-1/2 transform -translate-x-1/2 w-[90%] max-w-3xl p-8 bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-4 border-slate-200 z-50 animate-float">
-            <div className="flex items-center gap-2 border-b-2 pb-4 mb-6 w-full justify-center">
-              <span className="font-black text-slate-700 text-2xl">⚙️ おそうじの時間をえらぶ</span>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full mb-6">
-              {[10, 15, 20, 25].map((min) => (
-                <button
-                  key={min}
-                  onClick={() => changeDuration(min)}
-                  className={`py-6 px-4 rounded-2xl font-black text-3xl md:text-4xl border-4 flex flex-col items-center justify-center gap-2 transition-all ${
-                    durationMinutes === min 
-                      ? 'bg-blue-500 border-blue-600 text-white shadow-lg transform scale-105' 
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <span>{min} <span className="text-xl md:text-2xl">分</span></span>
-                  {durationMinutes === min && <span className="text-2xl">✅</span>}
-                </button>
-              ))}
-            </div>
-            <div className="border-t-2 border-slate-100 pt-6 flex justify-between items-center">
-              <button 
-                onClick={() => setShowSettings(false)}
-                className="text-slate-500 hover:text-slate-700 font-bold text-lg px-6 py-3 bg-slate-100 rounded-xl"
-              >
-                とじる
-              </button>
-              <button 
-                onClick={startDemo}
-                className="inline-flex items-center space-x-2 bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-md"
-              >
-                <span>⏱️ 先生用：高速テスト(100倍速)</span>
-              </button>
-            </div>
-          </div>
-        )}
+      // プログレスバー更新
+      progressBar.style.width = `${percentage}%`;
+      removeClasses(progressBar, barClasses);
+      addClasses(progressBar, theme.bar);
 
-        {/* 巨大デジタルタイマー */}
-        <div className="flex flex-col items-center justify-center flex-grow z-10 py-4">
-          <div className="text-base md:text-xl font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2 bg-white/80 px-6 py-2 rounded-full shadow-sm">
-            <span>⏱️</span> のこりじかん
-          </div>
-          <div className={`bg-slate-900 ${theme.timerText} px-8 md:px-16 py-4 md:py-6 rounded-[2rem] shadow-inner border-8 border-slate-800 flex items-baseline justify-center font-mono select-none w-[95%] md:w-auto transition-colors duration-300`}>
-            <span className="text-[6rem] md:text-[10rem] lg:text-[13rem] font-black tracking-widest leading-none drop-shadow-md">{timerDisplay.m}</span>
-            <span className={`text-[4rem] md:text-[7rem] lg:text-[9rem] font-black mx-2 md:mx-6 pb-4 md:pb-8 ${theme.timerColon} ${isActive && !isFinished ? 'animate-pulse' : ''} leading-none`}>:</span>
-            <span className="text-[6rem] md:text-[10rem] lg:text-[13rem] font-black tracking-widest leading-none drop-shadow-md">{timerDisplay.s}</span>
-          </div>
-        </div>
+      // その他の表示
+      durationDisplay.textContent = `おそうじタイム： ${durationMinutes}ぷん`;
 
-        {/* 吹き出しメッセージ */}
-        <div className="w-full flex items-center justify-center z-10 mb-6 shrink-0">
-          <div className="bg-white/95 rounded-3xl border-4 border-slate-200 px-8 py-6 shadow-lg relative w-11/12 max-w-4xl text-center">
-            <p className={`text-3xl md:text-5xl lg:text-6xl font-black transition-all duration-300 ${theme.text}`}>
-              {getKidsMessage()}
-            </p>
-            <div className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 w-8 h-8 bg-white border-r-4 border-b-4 border-slate-200 rotate-45"></div>
-          </div>
-        </div>
-
-        {/* ゲージとゾウさん（メーター部分） */}
-        <div className="w-full relative z-10 py-12 md:py-16 px-6 md:px-16 mt-2 bg-slate-50/70 rounded-[2.5rem] border-4 border-dashed border-slate-300 shrink-0">
-          
-          <div className="relative w-full">
-            <div className="absolute left-0 top-0 text-sm md:text-xl font-black text-slate-400 transform -translate-y-10 md:-translate-y-12 -translate-x-2">
-              🏠 スタート
-            </div>
-
-            <div className="absolute right-0 top-0 text-5xl md:text-7xl lg:text-8xl z-50 transform -translate-y-14 md:-translate-y-20 translate-x-4 md:translate-x-8 animate-bounce">
-              🏁
-              <span className="absolute -top-8 right-0 text-sm md:text-lg font-black text-red-500 bg-white px-3 py-1 rounded-full border-2 border-red-200 shadow-md whitespace-nowrap">
-                ゴール！
-              </span>
-            </div>
-
-            {/* キャラクター（ゾウさん：進行方向を向くように水平反転） */}
-            <div 
-              className="absolute top-0 z-30 transition-all duration-200 ease-out"
-              style={{ 
-                left: `calc(${elephantPosition}% - 3rem)`, 
-                transform: 'translateY(-60%)'
-              }}
-            >
-              <div className={`text-7xl md:text-8xl lg:text-9xl select-none flex flex-col items-center ${isActive ? 'animate-wiggle' : 'animate-float'}`}>
-                <span className="inline-block transform scale-x-[-1] drop-shadow-xl">{theme.character}</span>
-              </div>
-              {isActive && (
-                <div className="absolute -bottom-2 -left-4 text-3xl md:text-4xl animate-ping opacity-60">💨</div>
-              )}
-            </div>
-
-            {/* メーター本体（1.5倍の太さ、右に伸びる・左から削れる） */}
-            <div className="w-full h-[80px] md:h-[120px] bg-slate-200 rounded-[3rem] p-3 md:p-4 shadow-inner relative overflow-hidden flex items-center justify-end">
-              <div 
-                className={`h-full rounded-[2rem] transition-all duration-200 ease-linear ${theme.bar} shadow-lg relative z-10 flex items-center`}
-                style={{ width: `${percentage}%` }}
-              >
-                <div className="w-full h-1/2 bg-white/20 absolute top-0 rounded-t-[2rem]" />
-              </div>
-
-              {/* 1分ごとの区切り線（最前面レイヤー z-20） */}
-              <div className="absolute inset-0 py-3 md:py-4 px-4 flex justify-evenly items-center z-20 pointer-events-none">
-                {Array.from({ length: durationMinutes - 1 }).map((_, i) => (
-                  <div 
-                    key={i} 
-                    className="h-full w-2 md:w-3 bg-white/90 shadow-sm rounded-full mix-blend-overlay" 
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="w-full flex justify-between px-2 mt-4 text-sm md:text-xl font-black text-slate-400">
-              <span>おわり</span>
-              <span className="text-slate-500 bg-slate-200 px-4 py-1 rounded-full">おそうじタイム： {durationMinutes}ぷん</span>
-              <span>はじめ</span>
-            </div>
-          </div>
-        </div>
-
-        {/* コントロールボタン */}
-        <div className="flex flex-col items-center gap-4 z-10 w-full mt-6 shrink-0">
-          <div className="flex justify-center w-full">
-            {!isActive ? (
-              <button 
-                onClick={startTimer}
-                className="flex items-center justify-center space-x-4 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-12 md:px-24 py-6 md:py-8 rounded-[2.5rem] text-3xl md:text-5xl lg:text-6xl font-black shadow-2xl active:scale-95 transition-transform w-full md:w-auto"
-              >
-                <span>▶ スタート！</span>
-              </button>
-            ) : (
-              <button 
-                onClick={stopTimer}
-                className="flex items-center justify-center space-x-4 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white px-12 md:px-24 py-6 md:py-8 rounded-[2.5rem] text-3xl md:text-5xl lg:text-6xl font-black shadow-2xl active:scale-95 transition-transform w-full md:w-auto"
-              >
-                <span>■ ストップ</span>
-              </button>
-            )}
-          </div>
-
-          {/* 先生用：終了予想時刻 */}
-          {isActive && !isFinished && (
-            <div className="text-slate-500 text-sm md:text-lg bg-white border-2 border-slate-100 rounded-full px-6 py-2 flex items-center gap-2 font-bold shadow-sm">
-              <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-              先生用：このまま進むと <strong className="text-slate-800 text-xl md:text-2xl">{getTargetFinishTime()}</strong> 頃にお掃除が終わります。
-            </div>
-          )}
-        </div>
-
-      </div>
-    </div>
-  );
-}
+      if (!isActive) {
+        btnStart.classList.remove('hidden');
+        btnStop.classList.add('hidden');
+        finishTimeContainer.classList.add('hidden');
+      } else {
+        btnStart.classList.add('hidden');
+        btnStop.classList.remove('hidden');
+        if (!isFinished) {
+          finishTimeContainer.classList.remove('hidden');
+          finishTimeText.textContent = getTargetFinishTime();
+        } else {
+          finishTimeContainer.classList.add('hidden');
+        }
+      }
+    }
+  </script>
+</body>
+</html>
