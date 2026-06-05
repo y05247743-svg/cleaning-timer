@@ -110,12 +110,24 @@
 
         <!-- コントロールボタン -->
         <div class="flex flex-col items-center justify-center gap-4 shrink-0 w-full md:w-[220px] lg:w-[260px]">
+          <!-- スタートボタン (初期状態) -->
           <button id="btn-start" class="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white py-4 lg:py-6 rounded-[2rem] text-2xl lg:text-3xl font-black shadow-xl active:scale-95 transition-transform">
             <span>▶ スタート</span>
           </button>
+
+          <!-- 一時停止ボタン -->
+          <button id="btn-pause" class="hidden w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white py-4 lg:py-6 rounded-[2rem] text-2xl lg:text-3xl font-black shadow-xl active:scale-95 transition-transform">
+            <span>‖ 一時停止</span>
+          </button>
+
+          <!-- 再開(さいかい)ボタン -->
+          <button id="btn-resume" class="hidden w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white py-4 lg:py-6 rounded-[2rem] text-2xl lg:text-3xl font-black shadow-xl active:scale-95 transition-transform">
+            <span>▶ さいかい</span>
+          </button>
           
-          <button id="btn-stop" class="hidden w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white py-4 lg:py-6 rounded-[2rem] text-2xl lg:text-3xl font-black shadow-xl active:scale-95 transition-transform">
-            <span>■ ストップ</span>
+          <!-- リセット(やめる)ボタン -->
+          <button id="btn-reset" class="hidden w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-slate-500 to-slate-600 hover:from-slate-600 hover:to-slate-700 text-white py-3 lg:py-4 rounded-[1.5rem] text-xl lg:text-2xl font-bold shadow-md active:scale-95 transition-transform">
+            <span>■ リセット</span>
           </button>
           
           <!-- 先生用：終了予想時刻 -->
@@ -190,7 +202,8 @@
 
   <script>
     // State
-    let isActive = false;
+    let isStarted = false;       // タイマーが起動状態にあるか (一時停止中も含む)
+    let isActive = false;        // カウントダウンが「稼働中」か
     let durationMinutes = 15;
     let remainingTimeMs = 15 * 60 * 1000;
     let endTime = null;
@@ -198,7 +211,7 @@
     let soundEnabled = true;
     let isDemoMode = false;
     let timerInterval = null;
-    let wakeLock = null; // 画面スリープ防止用
+    let wakeLock = null;         // 画面スリープ防止用
 
     // DOM Elements
     const appContainer = document.getElementById('app-container');
@@ -220,8 +233,13 @@
     const progressBar = document.getElementById('progress-bar');
     const dividersContainer = document.getElementById('dividers-container');
     const durationDisplay = document.getElementById('duration-display');
+    
+    // コントロールボタン群
     const btnStart = document.getElementById('btn-start');
-    const btnStop = document.getElementById('btn-stop');
+    const btnPause = document.getElementById('btn-pause');
+    const btnResume = document.getElementById('btn-resume');
+    const btnReset = document.getElementById('btn-reset');
+    
     const finishTimeContainer = document.getElementById('finish-time-container');
     const finishTimeText = document.getElementById('finish-time-text');
 
@@ -259,9 +277,11 @@
     // 状態の自動保存（リロード対策）
     function saveState() {
       const state = {
+        isStarted,
         isActive,
         durationMinutes,
         endTime,
+        remainingTimeMs,
         isFinished
       };
       localStorage.setItem('cleaningTimerState', JSON.stringify(state));
@@ -276,23 +296,31 @@
           if (state.durationMinutes) {
             durationMinutes = state.durationMinutes;
           }
+          isFinished = state.isFinished || false;
           
-          if (state.isActive && state.endTime) {
-            const now = Date.now();
-            if (now < state.endTime) {
-              isActive = true;
-              endTime = state.endTime;
-              remainingTimeMs = state.endTime - now;
-              isFinished = false;
-              startTimerLoop();
+          if (state.isStarted) {
+            isStarted = true;
+            if (state.isActive && state.endTime) {
+              const now = Date.now();
+              if (now < state.endTime) {
+                isActive = true;
+                endTime = state.endTime;
+                remainingTimeMs = state.endTime - now;
+                startTimerLoop();
+              } else {
+                isStarted = false;
+                isActive = false;
+                isFinished = true;
+                remainingTimeMs = 0;
+              }
             } else {
+              // 一時停止した状態でリロードされた場合
               isActive = false;
-              isFinished = true;
-              remainingTimeMs = 0;
+              remainingTimeMs = state.remainingTimeMs || (durationMinutes * 60 * 1000);
             }
           } else {
+            isStarted = false;
             isActive = false;
-            isFinished = state.isFinished || false;
             remainingTimeMs = durationMinutes * 60 * 1000;
             if (isFinished) remainingTimeMs = 0;
           }
@@ -378,6 +406,7 @@
         if (nextRemaining <= 0) {
           remainingTimeMs = 0;
           isActive = false;
+          isStarted = false;
           isFinished = true;
           playFinishedChime();
           clearInterval(timerInterval);
@@ -393,7 +422,6 @@
     // 分の読み方を判定する関数 (1年生の読み方に準拠)
     function getMinuteReading(min) {
       const lastDigit = min % 10;
-      // 1, 3, 4, 6, 8, 0(10の位)は「ぷん」、それ以外は「ふん」
       if (min === 10 || min === 20 || min === 30 || [1, 3, 4, 6, 8].includes(lastDigit)) {
         return 'ぷん';
       }
@@ -405,14 +433,12 @@
       settingDurationText.textContent = durationMinutes;
       settingReadingText.textContent = getMinuteReading(durationMinutes);
       
-      // 1分未満や30分以上の設定を制限
       btnDecrease.style.opacity = durationMinutes <= 1 ? '0.5' : '1';
       btnDecrease.style.pointerEvents = durationMinutes <= 1 ? 'none' : 'auto';
       
       btnIncrease.style.opacity = durationMinutes >= 30 ? '0.5' : '1';
       btnIncrease.style.pointerEvents = durationMinutes >= 30 ? 'none' : 'auto';
 
-      // ショートカットボタンのアクティブ状態を更新
       shortcutBtns.forEach(btn => {
         const min = parseInt(btn.dataset.min);
         if (min === durationMinutes) {
@@ -430,6 +456,7 @@
       durationMinutes = minutes;
       remainingTimeMs = minutes * 60 * 1000;
       isActive = false;
+      isStarted = false;
       isFinished = false;
       isDemoMode = false;
       clearInterval(timerInterval);
@@ -456,9 +483,10 @@
       });
     });
 
+    // スタートボタン
     btnStart.addEventListener('click', () => {
       isFinished = false;
-      isDemoMode = false; // ★通常スタート時はデモモードを確実にクリアする
+      isDemoMode = false; 
       settingsModal.classList.add('hidden');
       btnSettings.classList.replace('bg-blue-100', 'bg-slate-100');
       btnSettings.classList.replace('text-blue-600', 'text-slate-600');
@@ -466,14 +494,36 @@
       endTime = Date.now() + (durationMinutes * 60 * 1000);
       remainingTimeMs = durationMinutes * 60 * 1000;
       isActive = true;
+      isStarted = true;
       requestWakeLock(); 
       saveState();       
       startTimerLoop();
       updateUI();
     });
 
-    btnStop.addEventListener('click', () => {
+    // 一時停止ボタン
+    btnPause.addEventListener('click', () => {
       isActive = false;
+      clearInterval(timerInterval);
+      releaseWakeLock(); 
+      saveState();       
+      updateUI();
+    });
+
+    // 再開(さいかい)ボタン
+    btnResume.addEventListener('click', () => {
+      isActive = true;
+      endTime = Date.now() + remainingTimeMs; // 現在時刻から残りの時間を足して、新たな終了予想時刻をセット
+      requestWakeLock();
+      saveState();
+      startTimerLoop();
+      updateUI();
+    });
+
+    // リセットボタン（初期状態へ戻る）
+    btnReset.addEventListener('click', () => {
+      isActive = false;
+      isStarted = false;
       isDemoMode = false;
       remainingTimeMs = durationMinutes * 60 * 1000;
       clearInterval(timerInterval);
@@ -512,6 +562,7 @@
       endTime = Date.now() + ((durationMinutes * 60 * 1000) / 100);
       remainingTimeMs = durationMinutes * 60 * 1000;
       isActive = true;
+      isStarted = true;
       settingsModal.classList.add('hidden');
       requestWakeLock(); 
       startTimerLoop();
@@ -526,7 +577,6 @@
 
       for (let i = 0; i < dividerCount; i++) {
         const div = document.createElement('div');
-        // 分数が多いときは線を細くして見やすく調整
         if (durationMinutes > 20) {
           div.className = 'h-full w-1 md:w-1.5 bg-white/90 shadow-sm rounded-full mix-blend-overlay';
         } else {
@@ -536,9 +586,9 @@
       }
     }
 
-    // ユーティリティ関数（ミリ秒数がマイナスにならないよう安全に変換する）
+    // ユーティリティ関数
     function formatTimer(ms) {
-      const safeMs = Math.max(0, ms); // ★ミリ秒が絶対に負の値にならないようにガードする
+      const safeMs = Math.max(0, ms); 
       const totalSeconds = Math.ceil(safeMs / 1000);
       const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
       const s = (totalSeconds % 60).toString().padStart(2, '0');
@@ -572,12 +622,12 @@
       const elephantPosition = 100 - percentage;
       const remainingMinutes = remainingTimeMs / (60 * 1000);
       
-      // 切り上げた残り時間(分)で応援メッセージを表示する
       const remainingMinCeil = Math.ceil(remainingTimeMs / (60 * 1000));
 
       // テーマ判定
       let theme;
       if (isFinished) theme = themes.finished;
+      else if (isStarted && !isActive) theme = themes.warning; // 一時停止中はオレンジ色寄りに
       else if (remainingMinutes <= 3) theme = themes.danger;
       else if (remainingMinutes <= 7) theme = themes.warning;
       else theme = themes.normal;
@@ -607,12 +657,13 @@
       if (isActive && !isFinished) timerColon.classList.add('animate-pulse');
       else timerColon.classList.remove('animate-pulse');
 
-      // メッセージの動的更新（実際の残り分数を表示）
+      // メッセージの動的更新
       const readingMsg = getMinuteReading(remainingMinCeil);
       let kidsMsg = "";
       if (isFinished) kidsMsg = "おわり！ぴっかぴかで きもちいいね！🎉";
-      else if (!isActive && percentage === 100) kidsMsg = "じかんをえらんで「スタート」してね！";
-      else if (!isActive) kidsMsg = "おやすみちゅう...💤";
+      else if (!isStarted && percentage === 100) kidsMsg = "じかんをえらんで「スタート」してね！";
+      else if (!isStarted) kidsMsg = "おやすみちゅう...💤";
+      else if (!isActive) kidsMsg = "ちょっと ストップちゅう！⏸️"; // 一時停止時のメッセージ
       else if (remainingTimeMs > 7 * 60 * 1000) kidsMsg = "みんなで ピカピカに しよう！🧹✨";
       else if (remainingTimeMs > 3 * 60 * 1000) kidsMsg = `あと ${remainingMinCeil}${readingMsg}！すこし いそごう！🎒`;
       else kidsMsg = `あと ${remainingMinCeil}${readingMsg}！さいごの しあげだ！🔥`;
@@ -643,19 +694,32 @@
       const reading = getMinuteReading(durationMinutes);
       durationDisplay.textContent = `おそうじタイム： ${durationMinutes}${reading}`;
 
-      // ボタン切り替え
-      if (!isActive) {
+      // ボタン切り替え制御 (一時停止に対応)
+      if (!isStarted) {
         btnStart.classList.remove('hidden');
-        btnStop.classList.add('hidden');
+        btnPause.classList.add('hidden');
+        btnResume.classList.add('hidden');
+        btnReset.classList.add('hidden');
         finishTimeContainer.classList.add('hidden');
       } else {
         btnStart.classList.add('hidden');
-        btnStop.classList.remove('hidden');
-        if (!isFinished) {
-          finishTimeContainer.classList.remove('hidden');
-          finishTimeText.textContent = getTargetFinishTime();
+        btnReset.classList.remove('hidden');
+        
+        if (isActive) {
+          // 動いている時
+          btnPause.classList.remove('hidden');
+          btnResume.classList.add('hidden');
+          if (!isFinished) {
+            finishTimeContainer.classList.remove('hidden');
+            finishTimeText.textContent = getTargetFinishTime();
+          } else {
+            finishTimeContainer.classList.add('hidden');
+          }
         } else {
-          finishTimeContainer.classList.add('hidden');
+          // 一時停止している時
+          btnPause.classList.add('hidden');
+          btnResume.classList.remove('hidden');
+          finishTimeContainer.classList.add('hidden'); // 一時停止中は終了時間を隠す
         }
       }
     }
