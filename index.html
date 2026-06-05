@@ -58,7 +58,7 @@
       <!-- 設定パネル（オーバーレイ表示） -->
       <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
         <div class="w-full max-w-3xl bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border-4 border-slate-200 p-6 animate-float flex flex-col max-h-full overflow-y-auto">
-          <div class="flex items-center gap-2 border-b-2 pb-3 mb-6 w-full justify-center">
+          <div class="flex items-center gap-2 border-b-2 pb-3 mb-4 w-full justify-center">
             <span class="font-black text-slate-700 text-2xl">⚙️ おそうじの時間をえらぶ</span>
           </div>
           
@@ -458,6 +458,7 @@
 
     btnStart.addEventListener('click', () => {
       isFinished = false;
+      isDemoMode = false; // ★通常スタート時はデモモードを確実にクリアする
       settingsModal.classList.add('hidden');
       btnSettings.classList.replace('bg-blue-100', 'bg-slate-100');
       btnSettings.classList.replace('text-blue-600', 'text-slate-600');
@@ -535,9 +536,10 @@
       }
     }
 
-    // ユーティリティ関数
+    // ユーティリティ関数（ミリ秒数がマイナスにならないよう安全に変換する）
     function formatTimer(ms) {
-      const totalSeconds = Math.ceil(ms / 1000);
+      const safeMs = Math.max(0, ms); // ★ミリ秒が絶対に負の値にならないようにガードする
+      const totalSeconds = Math.ceil(safeMs / 1000);
       const m = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
       const s = (totalSeconds % 60).toString().padStart(2, '0');
       return { m, s };
