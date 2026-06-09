@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <!-- iPadでのピンチズームやダブルタップズームを防止し、アプリのように固定する設定 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>おそうじタイマー</title>
+  <title>がっこう タイマー</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     /* アニメーション設定 */
@@ -38,16 +38,31 @@
       <!-- 終了時のフラッシュエフェクト -->
       <div id="finish-overlay" class="absolute inset-0 bg-yellow-100/40 pointer-events-none flex items-center justify-center animate-pulse z-0 hidden"></div>
 
-      <!-- [上部] ヘッダーエリア -->
-      <div class="w-full flex justify-between items-center z-10 shrink-0">
+      <!-- [上部] ヘッダーエリア (タイマー切り替えメニューが背後に隠れないよう z-40 に引き上げ) -->
+      <div class="w-full flex justify-between items-center z-40 shrink-0 relative">
         <button id="btn-sound" class="p-3 bg-slate-100 hover:bg-slate-200 rounded-xl md:rounded-2xl transition-all text-slate-600 active:scale-95 text-base md:text-lg font-bold">
           🔊 おとあり
         </button>
 
-        <div class="flex items-center space-x-2 text-blue-500">
+        <!-- タイマー切り替えが可能なヘッダータイトル -->
+        <div id="header-title-trigger" class="flex items-center space-x-2 text-blue-500 cursor-pointer bg-blue-50 hover:bg-blue-100 active:scale-95 px-4 py-2 rounded-2xl border-2 border-dashed border-blue-200 transition-all select-none">
           <span class="text-2xl animate-pulse hidden md:block">✨</span>
-          <h1 class="text-2xl md:text-4xl lg:text-5xl font-black tracking-wider text-slate-800">おそうじ タイマー</h1>
+          <h1 id="header-title" class="text-2xl md:text-4xl lg:text-5xl font-black tracking-wider text-slate-800 flex items-center gap-2">
+            <span>おそうじ タイマー</span>
+            <span class="text-xl md:text-2xl text-blue-500">▼</span>
+          </h1>
           <span class="text-2xl animate-pulse hidden md:block">✨</span>
+        </div>
+
+        <!-- タイマー選択ドロップダウンメニュー (確実に一番手前に来るよう z-[100] に設定) -->
+        <div id="timer-select-dropdown" class="hidden absolute top-20 left-1/2 transform -translate-x-1/2 bg-white/95 backdrop-blur-md border-4 border-blue-400 rounded-2xl shadow-2xl p-4 z-[100] w-80 flex flex-col gap-3 animate-float">
+          <div class="text-center font-bold text-slate-500 text-sm border-b pb-2">タイマーをえらんでね</div>
+          <button id="select-cleaning" class="w-full py-4 bg-blue-500 hover:bg-blue-600 text-white font-black text-xl rounded-xl transition-all shadow-md active:scale-95">
+            🧹 おそうじ タイマー
+          </button>
+          <button id="select-leaving" class="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-black text-xl rounded-xl transition-all shadow-md active:scale-95">
+            🎒 かえりのしたく
+          </button>
         </div>
 
         <button id="btn-settings" class="p-3 rounded-xl md:rounded-2xl transition-all active:scale-95 text-base md:text-lg font-bold bg-slate-100 hover:bg-slate-200 text-slate-600">
@@ -59,7 +74,7 @@
       <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm p-4">
         <div class="w-full max-w-3xl bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border-4 border-slate-200 p-6 animate-float flex flex-col max-h-full overflow-y-auto">
           <div class="flex items-center gap-2 border-b-2 pb-3 mb-4 w-full justify-center">
-            <span class="font-black text-slate-700 text-2xl">⚙️ おそうじの時間をえらぶ</span>
+            <span class="font-black text-slate-700 text-2xl">⚙️ タイマーの時間をえらぶ</span>
           </div>
           
           <!-- 1〜30分の設定UI -->
@@ -167,7 +182,7 @@
             </span>
           </div>
 
-          <!-- キャラクター（ゾウさん） -->
+          <!-- キャラクター（ゾウさん or クマさん） -->
           <div id="elephant-container" class="absolute top-0 z-30 animate-float" style="left: calc(0% - 2rem); transform: translateY(-50%);">
             <div class="text-5xl lg:text-7xl select-none flex flex-col items-center">
               <span id="elephant-text" class="inline-block transform scale-x-[-1] drop-shadow-lg">🐘</span>
@@ -202,6 +217,7 @@
 
   <script>
     // State
+    let currentMode = 'cleaning'; // 'cleaning' (おそうじ) または 'leaving' (かえりのしたく)
     let isStarted = false;       // タイマーが起動状態にあるか (一時停止中も含む)
     let isActive = false;        // カウントダウンが「稼働中」か
     let durationMinutes = 15;
@@ -212,6 +228,14 @@
     let isDemoMode = false;
     let timerInterval = null;
     let wakeLock = null;         // 画面スリープ防止用
+
+    // かえりのしたく用メッセージ候補 (20秒おきに自動ループ)
+    const leavingMessages = [
+      "つくえを せいとん しよう！🏫",
+      "はくいぼう は もった？🥋",
+      "すいとうは もった？🍼",
+      "ゴミを3つひろおう！🧹"
+    ];
 
     // DOM Elements
     const appContainer = document.getElementById('app-container');
@@ -234,6 +258,13 @@
     const dividersContainer = document.getElementById('dividers-container');
     const durationDisplay = document.getElementById('duration-display');
     
+    // タイマー切り替え用の要素
+    const headerTitleTrigger = document.getElementById('header-title-trigger');
+    const headerTitle = document.getElementById('header-title');
+    const timerSelectDropdown = document.getElementById('timer-select-dropdown');
+    const selectCleaning = document.getElementById('select-cleaning');
+    const selectLeaving = document.getElementById('select-leaving');
+
     // コントロールボタン群
     const btnStart = document.getElementById('btn-start');
     const btnPause = document.getElementById('btn-pause');
@@ -250,7 +281,7 @@
     const settingReadingText = document.getElementById('setting-reading');
     const shortcutBtns = document.querySelectorAll('.shortcut-btn');
 
-    // Themes
+    // Themes (React版と同様)
     const themes = {
       finished: {
         bar: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-300', cardBg: 'bg-emerald-50', border: 'border-emerald-100', character: '👑🐘✨', timerText: 'text-emerald-400', timerColon: 'text-emerald-600'
@@ -263,6 +294,19 @@
       },
       normal: {
         bar: 'bg-green-400', text: 'text-green-800 font-bold', bg: 'bg-green-400', cardBg: 'bg-green-50', border: 'border-green-200', character: '🐘', timerText: 'text-emerald-400', timerColon: 'text-emerald-600'
+      },
+      // かえりのしたく時のキャラクター切り替え用 (テーマカラーは同じだが、動作時の絵文字を変える)
+      finishedLeaving: {
+        bar: 'bg-emerald-500', text: 'text-emerald-700', bg: 'bg-emerald-300', cardBg: 'bg-emerald-50', border: 'border-emerald-100', character: '👑🐻🎒✨', timerText: 'text-emerald-400', timerColon: 'text-emerald-600'
+      },
+      dangerLeaving: {
+        bar: 'bg-red-500 animate-pulse', text: 'text-red-800 font-extrabold', bg: 'animate-danger-flash', cardBg: 'bg-transparent', border: 'border-red-500', character: '🏃🐻🎒💨', timerText: 'text-red-400', timerColon: 'text-red-600'
+      },
+      warningLeaving: {
+        bar: 'bg-amber-400', text: 'text-amber-800 font-bold', bg: 'bg-amber-400', cardBg: 'bg-amber-50', border: 'border-amber-200', character: '🎒🐻🏡', timerText: 'text-amber-300', timerColon: 'text-amber-500'
+      },
+      normalLeaving: {
+        bar: 'bg-green-400', text: 'text-green-800 font-bold', bg: 'bg-green-400', cardBg: 'bg-green-50', border: 'border-green-200', character: '🐻🎒', timerText: 'text-emerald-400', timerColon: 'text-emerald-600'
       }
     };
 
@@ -277,6 +321,7 @@
     // 状態の自動保存（リロード対策）
     function saveState() {
       const state = {
+        currentMode,
         isStarted,
         isActive,
         durationMinutes,
@@ -293,6 +338,9 @@
       if (saved) {
         try {
           const state = JSON.parse(saved);
+          if (state.currentMode) {
+            currentMode = state.currentMode;
+          }
           if (state.durationMinutes) {
             durationMinutes = state.durationMinutes;
           }
@@ -314,7 +362,6 @@
                 remainingTimeMs = 0;
               }
             } else {
-              // 一時停止した状態でリロードされた場合
               isActive = false;
               remainingTimeMs = state.remainingTimeMs || (durationMinutes * 60 * 1000);
             }
@@ -483,6 +530,33 @@
       });
     });
 
+    // タイマーモード切り替えメニュー
+    headerTitleTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isHidden = timerSelectDropdown.classList.contains('hidden');
+      if (isHidden) {
+        timerSelectDropdown.classList.remove('hidden');
+      } else {
+        timerSelectDropdown.classList.add('hidden');
+      }
+    });
+
+    document.addEventListener('click', () => {
+      timerSelectDropdown.classList.add('hidden');
+    });
+
+    selectCleaning.addEventListener('click', () => {
+      currentMode = 'cleaning';
+      timerSelectDropdown.classList.add('hidden');
+      changeDuration(durationMinutes); // 時間リセットとUI更新
+    });
+
+    selectLeaving.addEventListener('click', () => {
+      currentMode = 'leaving';
+      timerSelectDropdown.classList.add('hidden');
+      changeDuration(durationMinutes); // 時間リセットとUI更新
+    });
+
     // スタートボタン
     btnStart.addEventListener('click', () => {
       isFinished = false;
@@ -513,7 +587,7 @@
     // 再開(さいかい)ボタン
     btnResume.addEventListener('click', () => {
       isActive = true;
-      endTime = Date.now() + remainingTimeMs; // 現在時刻から残りの時間を足して、新たな終了予想時刻をセット
+      endTime = Date.now() + remainingTimeMs;
       requestWakeLock();
       saveState();
       startTimerLoop();
@@ -595,6 +669,7 @@
       return { m, s };
     }
 
+    // 終了時間を表示用フォーマット
     function getTargetFinishTime() {
       if (!isActive || isFinished) return "--:--";
       const finishDate = new Date(Date.now() + remainingTimeMs);
@@ -624,13 +699,31 @@
       
       const remainingMinCeil = Math.ceil(remainingTimeMs / (60 * 1000));
 
-      // テーマ判定
+      // 現在のタイマー種別にあわせたモード名をヘッダーに描画
+      if (currentMode === 'cleaning') {
+        headerTitle.innerHTML = '<span>おそうじ タイマー</span> <span class="text-xl md:text-2xl text-blue-500">▼</span>';
+        durationDisplay.textContent = `おそうじタイム： ${durationMinutes}${getMinuteReading(durationMinutes)}`;
+      } else {
+        headerTitle.innerHTML = '<span>かえりのしたく</span> <span class="text-xl md:text-2xl text-amber-500">▼</span>';
+        durationDisplay.textContent = `したくタイム： ${durationMinutes}${getMinuteReading(durationMinutes)}`;
+      }
+
+      // テーマ判定 (現在のタイマーの種類に応じてゾウとクマを出し分け)
       let theme;
-      if (isFinished) theme = themes.finished;
-      else if (isStarted && !isActive) theme = themes.warning; // 一時停止中はオレンジ色寄りに
-      else if (remainingMinutes <= 3) theme = themes.danger;
-      else if (remainingMinutes <= 7) theme = themes.warning;
-      else theme = themes.normal;
+      if (currentMode === 'cleaning') {
+        if (isFinished) theme = themes.finished;
+        else if (isStarted && !isActive) theme = themes.warning;
+        else if (remainingMinutes <= 3) theme = themes.danger;
+        else if (remainingMinutes <= 7) theme = themes.warning;
+        else theme = themes.normal;
+      } else {
+        // かえりのしたく用の絵文字
+        if (isFinished) theme = themes.finishedLeaving;
+        else if (isStarted && !isActive) theme = themes.warningLeaving;
+        else if (remainingMinutes <= 3) theme = themes.dangerLeaving;
+        else if (remainingMinutes <= 7) theme = themes.warningLeaving;
+        else theme = themes.normalLeaving;
+      }
 
       removeClasses(appContainer, bgClasses);
       addClasses(appContainer, theme.bg);
@@ -660,19 +753,36 @@
       // メッセージの動的更新
       const readingMsg = getMinuteReading(remainingMinCeil);
       let kidsMsg = "";
-      if (isFinished) kidsMsg = "おわり！ぴっかぴかで きもちいいね！🎉";
-      else if (!isStarted && percentage === 100) kidsMsg = "じかんをえらんで「スタート」してね！";
-      else if (!isStarted) kidsMsg = "おやすみちゅう...💤";
-      else if (!isActive) kidsMsg = "ちょっと ストップちゅう！⏸️"; // 一時停止時のメッセージ
-      else if (remainingTimeMs > 7 * 60 * 1000) kidsMsg = "みんなで ピカピカに しよう！🧹✨";
-      else if (remainingTimeMs > 3 * 60 * 1000) kidsMsg = `あと ${remainingMinCeil}${readingMsg}！すこし いそごう！🎒`;
-      else kidsMsg = `あと ${remainingMinCeil}${readingMsg}！さいごの しあげだ！🔥`;
+
+      if (isFinished) {
+        kidsMsg = "おわり！ぴっかぴかで きもちいいね！🎉";
+      } else if (!isStarted && percentage === 100) {
+        kidsMsg = "じかんをえらんで「スタート」してね！";
+      } else if (!isStarted) {
+        kidsMsg = "おやすみちゅう...💤";
+      } else if (!isActive) {
+        kidsMsg = "ちょっと ストップちゅう！⏸️";
+      } else {
+        // 稼働中のメッセージ分岐
+        if (currentMode === 'cleaning') {
+          // 従来のお掃除タイマーのロジック
+          if (remainingTimeMs > 7 * 60 * 1000) kidsMsg = "みんなで ピカピカに しよう！🧹✨";
+          else if (remainingTimeMs > 3 * 60 * 1000) kidsMsg = `あと ${remainingMinCeil}${readingMsg}！すこし いそごう！🎒`;
+          else kidsMsg = `あと ${remainingMinCeil}${readingMsg}！さいごの しあげだ！🔥`;
+        } else {
+          // ★「かえりのしたく」：20秒おきにメッセージをループ
+          const elapsedTimeMs = Math.max(0, totalDurationMs - remainingTimeMs);
+          const intervalDurationMs = isDemoMode ? (20 * 1000 / 100) : (20 * 1000);
+          const messageIndex = Math.floor(elapsedTimeMs / intervalDurationMs) % leavingMessages.length;
+          kidsMsg = leavingMessages[messageIndex];
+        }
+      }
 
       messageText.textContent = kidsMsg;
       removeClasses(messageText, textClasses);
       addClasses(messageText, theme.text);
 
-      // ゾウさんの更新
+      // ゾウさん or クマさんの更新
       elephantContainer.style.left = `calc(${elephantPosition}% - 2rem)`;
       elephantText.textContent = theme.character;
       
@@ -691,10 +801,7 @@
       removeClasses(progressBar, barClasses);
       addClasses(progressBar, theme.bar);
 
-      const reading = getMinuteReading(durationMinutes);
-      durationDisplay.textContent = `おそうじタイム： ${durationMinutes}${reading}`;
-
-      // ボタン切り替え制御 (一時停止に対応)
+      // ボタン切り替え制御
       if (!isStarted) {
         btnStart.classList.remove('hidden');
         btnPause.classList.add('hidden');
@@ -706,7 +813,6 @@
         btnReset.classList.remove('hidden');
         
         if (isActive) {
-          // 動いている時
           btnPause.classList.remove('hidden');
           btnResume.classList.add('hidden');
           if (!isFinished) {
@@ -716,15 +822,14 @@
             finishTimeContainer.classList.add('hidden');
           }
         } else {
-          // 一時停止している時
           btnPause.classList.add('hidden');
           btnResume.classList.remove('hidden');
-          finishTimeContainer.classList.add('hidden'); // 一時停止中は終了時間を隠す
+          finishTimeContainer.classList.add('hidden');
         }
       }
     }
 
-    // 初期化処理の実行順序を整理
+    // 初期化処理の実行
     loadState();
     updateSettingUI();
     updateDividers();
